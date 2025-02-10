@@ -1,47 +1,54 @@
+import { useRef } from "react";
+
 import { useQuery } from "@tanstack/react-query";
-import { useRef, useState } from "react";
 
 export type BusData = {
   id: string;
+  ordem: string;
   linha: string;
   latitude: number;
   longitude: number;
   velocidade: number;
   timestamp: string;
-  sentido: string;
 };
 
 export function useBusData(linhas: Array<string>) {
-  const isFirstCall = useRef(true);
-  const [buses, setBuses] = useState<BusData[]>([]);
+  const allBuses = useRef<BusData[]>([]);
 
   return useQuery({
     queryKey: ["buses", linhas],
     queryFn: async () => {
       const queryParams = new URLSearchParams();
-      if (!isFirstCall.current) queryParams.append("latest", "true");
 
-      // Converte o array de linhas para uma string separada por vírgulas
-      if (linhas.length > 0) queryParams.append("linhas", linhas.join(","));
+      if (allBuses.current.length > 0) {
+        queryParams.append("latest", "true");
+      }
+
+      if (linhas.length > 0) {
+        queryParams.append("linhas", linhas.join(","));
+      }
 
       const response = await fetch(`/api/buses?${queryParams.toString()}`);
       if (!response.ok) throw new Error("Erro ao buscar dados");
 
       const data = await response.json();
 
-      if (isFirstCall.current) {
-        setBuses(data);
-        isFirstCall.current = false;
-      } else if (data.length > 0) {
-        setBuses((prev) => {
-          const busMap = new Map(prev.map((bus) => [bus.id, bus]));
-          data.forEach((newBus: BusData) => busMap.set(newBus.id, newBus));
-          return Array.from(busMap.values());
-        });
+      if (allBuses.current.length === 0) {
+        // Primeira chamada: armazena todos os ônibus
+        allBuses.current = data;
+      } else {
+        // Chamadas subsequentes: mescla os novos dados com os existentes
+        const updatedBusesMap = new Map(
+          allBuses.current.map((bus) => [bus.id, bus])
+        );
+        data.forEach((newBus: BusData) =>
+          updatedBusesMap.set(newBus.id, newBus)
+        ); // Atualiza ou adiciona novos ônibus
+        allBuses.current = Array.from(updatedBusesMap.values()); // Converte o Map de volta para array
       }
 
-      return buses;
+      return allBuses.current; // Retorna a lista completa de ônibus
     },
-    refetchInterval: 10000,
+    refetchInterval: 5000, // Atualiza a cada 5 segundos
   });
 }

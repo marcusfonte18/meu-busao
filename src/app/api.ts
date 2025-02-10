@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import prisma from "@/lib/prisma";
 import { BusData } from "./useBusData";
 
 const DATARIO_URL = "https://dados.mobilidade.rio/gps/sppo";
@@ -24,19 +25,19 @@ function parseCoordinate(value?: string): number {
 function processBusData(data: any[], linhas: Array<string>): BusData[] {
   const uniqueBuses = new Map<string, BusData>();
 
-  console.log("linhas processed data", linhas);
+  console.log("processBusData", { tamanho: data.length, data: data[0] });
 
   data.forEach((bus) => {
     if (!linhas.includes(bus.linha)) return;
 
     uniqueBuses.set(bus.ordem, {
-      id: bus.ordem,
+      id: bus?.id ? bus.id : bus.ordem,
+      ordem: bus.ordem,
       linha: bus.linha,
       latitude: parseCoordinate(bus.latitude),
       longitude: parseCoordinate(bus.longitude),
       velocidade: bus.velocidade,
       timestamp: bus.datahora,
-      sentido: bus.sentido,
     });
   });
 
@@ -44,13 +45,17 @@ function processBusData(data: any[], linhas: Array<string>): BusData[] {
 }
 
 export async function fetchBusData(linhas: Array<string>): Promise<BusData[]> {
-  const response = await fetch(DATARIO_URL);
-  if (!response.ok) throw new Error("Erro ao carregar dados");
+  const buses = await prisma.bus.findMany({
+    where: {
+      linha: {
+        in: linhas,
+      },
+    },
+  });
 
-  return processBusData(await response.json(), linhas);
+  return processBusData(buses, linhas);
 }
 
-// Busca apenas os ônibus dos últimos 20s
 export async function fetchLast20SecondsBusData(
   linhas: Array<string>
 ): Promise<BusData[]> {

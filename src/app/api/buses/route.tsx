@@ -7,8 +7,6 @@ export async function GET(request: Request) {
     const latest = searchParams.get("latest") === "true";
     const linhasParam = searchParams.get("linhas");
 
-    console.log({ latest, linhasParam });
-
     // Converte a string de linhas separadas por vírgula para um array
     const linhas = linhasParam ? linhasParam.split(",") : [];
 
@@ -16,13 +14,7 @@ export async function GET(request: Request) {
       ? await fetchLast20SecondsBusData(linhas)
       : await fetchBusData(linhas);
 
-    // Filtra os dados de acordo com as linhas fornecidas
-    const filteredData =
-      linhas.length > 0
-        ? data.filter((bus) => linhas.includes(bus.linha))
-        : data;
-
-    return NextResponse.json(filteredData, { status: 200 });
+    return NextResponse.json(data, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       {
