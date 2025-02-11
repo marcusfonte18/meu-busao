@@ -108,7 +108,7 @@ const LocationButton = () => {
 
   const toggleLocation = () => {
     if (!isTracking) {
-      map.locate({ watch: true, enableHighAccuracy: true, setView: false }); // Desativa a atualização automática da visualização
+      map.locate({ enableHighAccuracy: true, setView: false }); // Desativa a atualização automática da visualização
       toast.success("Rastreando sua localização");
     } else {
       map.stopLocate();
