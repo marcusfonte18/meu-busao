@@ -4,11 +4,13 @@ import { useBusData } from "./useBusData";
 import { Bus, Loader2, X } from "lucide-react";
 import { BusMarkers } from "./MapView";
 import dynamic from "next/dynamic";
+import { Toaster } from "sonner";
 
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
 );
+
 const TileLayer = dynamic(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
   { ssr: false }
@@ -38,6 +40,7 @@ export const BusMap = ({
 
   return (
     <div className="w-full h-[100dvh] flex flex-col">
+      <Toaster position="top-center" />
       <Card className="flex-1 flex flex-col border-0 shadow-lg m-0 rounded-none md:m-4 md:rounded-lg">
         <CardHeader className="pb-2 px-4 pt-4">
           <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center justify-between">

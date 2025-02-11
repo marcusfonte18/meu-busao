@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 "use client";
-import React from "react";
-import { Bus, LocateFixed } from "lucide-react";
+import React, { useState } from "react";
+import { Bus, LocateFixed, Navigation } from "lucide-react";
 import dynamic from "next/dynamic";
 import { BusData } from "./types";
 import { useEffect } from "react";
 import { getColorForLine } from "@/utils";
 import "leaflet/dist/leaflet.css";
-import { useMap } from "react-leaflet";
+import { useMap, useMapEvents } from "react-leaflet";
+import { toast } from "sonner";
 
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
@@ -22,7 +23,6 @@ const getBusIcon = (linha: string) => {
   if (typeof window === "undefined") return null;
   const L = require("leaflet");
   const linhaColor = getColorForLine(linha);
-
   return new L.DivIcon({
     className: "bus-icon",
     html: `
@@ -58,6 +58,81 @@ const getBusIcon = (linha: string) => {
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
   });
+};
+
+const LocationButton = () => {
+  const [isTracking, setIsTracking] = useState(false);
+  const map = useMap();
+  let locationMarker: any = null;
+
+  const createLocationMarker = (latlng: any, accuracy: number) => {
+    if (typeof window === "undefined") return;
+    const L = require("leaflet");
+
+    if (locationMarker) {
+      map.removeLayer(locationMarker);
+    }
+
+    const locationIcon = new L.DivIcon({
+      className: "location-marker",
+      html: `
+        <div class="relative w-6 h-6">
+          <div class="absolute inset-0 bg-blue-500 rounded-full opacity-20 animate-ping"></div>
+          <div class="absolute inset-[25%] bg-blue-500 rounded-full border-2 border-white"></div>
+        </div>
+      `,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+
+    locationMarker = L.marker(latlng, { icon: locationIcon })
+      .addTo(map)
+      .bindPopup(`Precisão: ~${Math.round(accuracy)} metros`);
+
+    if (isTracking) {
+      map.setView(latlng);
+    }
+  };
+
+  useMapEvents({
+    locationfound: (e) => {
+      createLocationMarker(e.latlng, e.accuracy);
+    },
+    locationerror: () => {
+      toast.error("Não foi possível obter sua localização");
+      setIsTracking(false);
+    },
+  });
+
+  const toggleLocation = () => {
+    if (!isTracking) {
+      map.locate({ watch: true, enableHighAccuracy: true });
+      toast.success("Rastreando sua localização");
+    } else {
+      map.stopLocate();
+      if (locationMarker) {
+        map.removeLayer(locationMarker);
+      }
+      toast.info("Parou de rastrear localização");
+    }
+    setIsTracking(!isTracking);
+  };
+
+  return (
+    <div className="leaflet-bottom leaflet-right" style={{ zIndex: 999 }}>
+      <div className="leaflet-control leaflet-bar">
+        <button
+          onClick={toggleLocation}
+          className={`p-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+            isTracking ? "text-blue-500" : "text-gray-700 dark:text-gray-300"
+          }`}
+          title={isTracking ? "Parar de rastrear" : "Rastrear localização"}
+        >
+          <Navigation className="h-5 w-5" />
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export const BusMarkers = ({ buses }: { buses: any[] }) => {
@@ -98,6 +173,7 @@ export const BusMarkers = ({ buses }: { buses: any[] }) => {
           </Popup>
         </Marker>
       ))}
+      <LocationButton />
     </>
   );
 };
