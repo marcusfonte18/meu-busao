@@ -1,5 +1,5 @@
-import { fetchBusData, fetchLast20SecondsBusData } from "@/app/api";
 import { NextResponse } from "next/server";
+import { fetchBusData, fetchLast20SecondsBusData } from "./service";
 
 export async function GET(request: Request) {
   try {
@@ -7,7 +7,6 @@ export async function GET(request: Request) {
     const latest = searchParams.get("latest") === "true";
     const linhasParam = searchParams.get("linhas");
 
-    // Converte a string de linhas separadas por vírgula para um array
     const linhas = linhasParam ? linhasParam.split(",") : [];
 
     const data = latest

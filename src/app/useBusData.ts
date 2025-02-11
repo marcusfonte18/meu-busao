@@ -1,16 +1,7 @@
 import { useRef } from "react";
-
 import { useQuery } from "@tanstack/react-query";
 
-export type BusData = {
-  id: string;
-  ordem: string;
-  linha: string;
-  latitude: number;
-  longitude: number;
-  velocidade: number;
-  timestamp: string;
-};
+import { BusData } from "./types";
 
 export function useBusData(linhas: Array<string>) {
   const allBuses = useRef<BusData[]>([]);
@@ -34,21 +25,19 @@ export function useBusData(linhas: Array<string>) {
       const data = await response.json();
 
       if (allBuses.current.length === 0) {
-        // Primeira chamada: armazena todos os ônibus
         allBuses.current = data;
       } else {
-        // Chamadas subsequentes: mescla os novos dados com os existentes
         const updatedBusesMap = new Map(
           allBuses.current.map((bus) => [bus.id, bus])
         );
         data.forEach((newBus: BusData) =>
           updatedBusesMap.set(newBus.id, newBus)
-        ); // Atualiza ou adiciona novos ônibus
-        allBuses.current = Array.from(updatedBusesMap.values()); // Converte o Map de volta para array
+        );
+        allBuses.current = Array.from(updatedBusesMap.values());
       }
 
-      return allBuses.current; // Retorna a lista completa de ônibus
+      return allBuses.current;
     },
-    refetchInterval: 5000, // Atualiza a cada 5 segundos
+    refetchInterval: 5000,
   });
 }
