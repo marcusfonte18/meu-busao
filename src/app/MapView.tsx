@@ -1,16 +1,34 @@
 "use client";
 
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import dynamic from "next/dynamic";
 import { BusData } from "./types";
 import { useEffect } from "react";
 import { getColorForLine } from "@/utils";
-import L from "leaflet";
-
 import "leaflet/dist/leaflet.css";
 
-const getBusIcon = (linha: string) => {
-  if (typeof window === undefined) return;
+const MapContainer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(
+  () => import("react-leaflet").then((mod) => mod.Marker),
+  { ssr: false }
+);
+const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
+  ssr: false,
+});
 
+import { useMap } from "react-leaflet";
+
+const getBusIcon = (linha: string) => {
+  if (typeof window === "undefined") return null; // Evita erro no SSR
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const L = require("leaflet"); // Importação condicional
   const linhaColor = getColorForLine(linha);
 
   return new L.DivIcon({

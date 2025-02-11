@@ -12,14 +12,12 @@ export const BusMap = ({
 }) => {
   const { data: buses, isLoading } = useBusData(selectedLinha);
 
-  // Componente de Loading Personalizado com Tailwind
   if (isLoading || !buses) {
     return (
       <div className="flex justify-center items-center h-screen bg-black">
         <div className="text-center flex flex-col justify-center items-center ">
-          {/* Spinner com Tailwind */}
           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-white">Carregando...</p> {/* Texto branco */}
+          <p className="mt-4 text-white">Carregando...</p>
         </div>
       </div>
     );
