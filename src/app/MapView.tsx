@@ -89,8 +89,10 @@ const LocationButton = () => {
       .addTo(map)
       .bindPopup(`Precisão: ~${Math.round(accuracy)} metros`);
 
-    if (isTracking) {
+    // Ajusta a visualização apenas na primeira detecção de localização
+    if (isTracking && !locationMarker._initialViewSet) {
       map.setView(latlng);
+      locationMarker._initialViewSet = true; // Marca que a visualização inicial foi ajustada
     }
   };
 
@@ -106,7 +108,7 @@ const LocationButton = () => {
 
   const toggleLocation = () => {
     if (!isTracking) {
-      map.locate({ watch: true, enableHighAccuracy: true });
+      map.locate({ watch: true, enableHighAccuracy: true, setView: false }); // Desativa a atualização automática da visualização
       toast.success("Rastreando sua localização");
     } else {
       map.stopLocate();
