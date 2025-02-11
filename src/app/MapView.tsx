@@ -1,42 +1,58 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 "use client";
-
+import React from "react";
+import { Bus, LocateFixed } from "lucide-react";
 import dynamic from "next/dynamic";
 import { BusData } from "./types";
 import { useEffect } from "react";
 import { getColorForLine } from "@/utils";
 import "leaflet/dist/leaflet.css";
+import { useMap } from "react-leaflet";
 
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
-);
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
-);
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
   { ssr: false }
 );
+
 const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
   ssr: false,
 });
 
-import { useMap } from "react-leaflet";
-
 const getBusIcon = (linha: string) => {
-  if (typeof window === "undefined") return null; // Evita erro no SSR
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const L = require("leaflet"); // Importação condicional
+  if (typeof window === "undefined") return null;
+  const L = require("leaflet");
   const linhaColor = getColorForLine(linha);
 
   return new L.DivIcon({
     className: "bus-icon",
     html: `
-      <div style="background-color: ${linhaColor}; color: white; width: 32px; height: 32px; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold;">
+      <div style="
+        background-color: ${linhaColor};
+        color: white;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        border: 2px solid white;
+      ">
         ${linha}
-        <div style="position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); width: 12px; height: 12px; background-color: ${linhaColor}; border-radius: 50%;"></div>
+        <div style="
+          position: absolute;
+          bottom: -4px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 10px;
+          height: 10px;
+          background-color: ${linhaColor};
+          border-radius: 50%;
+          border: 2px solid white;
+        "></div>
       </div>`,
     iconSize: [32, 32],
     iconAnchor: [16, 32],
@@ -44,7 +60,7 @@ const getBusIcon = (linha: string) => {
   });
 };
 
-const BusMarkers = ({ buses }: { buses: any[] }) => {
+export const BusMarkers = ({ buses }: { buses: any[] }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -62,31 +78,26 @@ const BusMarkers = ({ buses }: { buses: any[] }) => {
           position={[bus.latitude, bus.longitude]}
           icon={getBusIcon(bus.linha)}
         >
-          <Popup className="m-0">
+          <Popup className="rounded-lg shadow-lg">
             <div className="p-2">
-              <h3 className="font-bold">Linha {bus.linha}</h3>
-              <p className="text-sm">Velocidade: {bus.velocidade}</p>
-              <p className="text-sm">Placa: {bus.ordem}</p>
+              <div className="flex items-center space-x-2 mb-1">
+                <Bus className="h-4 w-4 text-primary" />
+                <h3 className="font-bold text-base">Linha {bus.linha}</h3>
+              </div>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p className="flex items-center">
+                  <LocateFixed className="h-3 w-3 mr-1" />
+                  Velocidade: {bus.velocidade} km/h
+                </p>
+                <p className="flex items-center">
+                  <Bus className="h-3 w-3 mr-1" />
+                  Placa: {bus.ordem}
+                </p>
+              </div>
             </div>
           </Popup>
         </Marker>
       ))}
     </>
-  );
-};
-
-export const MapView = ({ buses }: { buses: BusData[] }) => {
-  return (
-    <MapContainer
-      center={[-22.9068, -43.1729]}
-      zoom={13}
-      style={{ height: "100%", width: "100%" }}
-    >
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      />
-      <BusMarkers buses={buses} />
-    </MapContainer>
   );
 };
