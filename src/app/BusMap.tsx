@@ -2,8 +2,17 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useBusData } from "./useBusData";
 import { Bus, Loader2, X } from "lucide-react";
-import { MapContainer, TileLayer } from "react-leaflet";
 import { BusMarkers } from "./MapView";
+import dynamic from "next/dynamic";
+
+const MapContainer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.TileLayer),
+  { ssr: false }
+);
 
 const LoadingState = () => (
   <div className="flex justify-center items-center h-[100dvh] bg-gray-100 dark:bg-gray-900">
