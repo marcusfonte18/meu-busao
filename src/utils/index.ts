@@ -16,17 +16,16 @@ export function parseCoordinate(value: string): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
-export const getColorForLine = (linha: string) => {
+export const getColorForLine = (line: string) => {
   let hash = 0;
-  for (let i = 0; i < linha.length; i++) {
-    hash = ((hash * 33) ^ linha.charCodeAt(i)) & 0xffffff; // Usando um número primo maior para dispersão
+  for (let i = 0; i < line.length; i++) {
+    hash = (hash * 31 + line.charCodeAt(i)) & 0xffffffff; // Hash melhor distribuído
   }
 
-  const color1 = (hash >> 16) & 0xff;
-  const color2 = (hash >> 8) & 0xff;
-  const color3 = hash & 0xff;
+  // Transformamos o hash em um valor dentro de 0-360 para matiz (H)
+  const hue = Math.abs(hash % 360); // Cores variadas
+  const saturation = 70; // Saturação fixa (deixar alto para cores vibrantes)
+  const lightness = 50; // Luminosidade fixa (para evitar cores muito escuras)
 
-  return `#${color1.toString(16).padStart(2, "0")}${color2
-    .toString(16)
-    .padStart(2, "0")}${color3.toString(16).padStart(2, "0")}`;
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };

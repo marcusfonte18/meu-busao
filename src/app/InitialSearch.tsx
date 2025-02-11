@@ -1,5 +1,4 @@
 import { useState } from "react";
-
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,41 +32,43 @@ export const InitialSearch = ({
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto mt-10">
-      <CardHeader>
-        <CardTitle>Buscar Linha de Ônibus</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="Digite o número da linha"
-              value={linhaInput}
-              onChange={(e) => setLinhaInput(e.target.value)}
-            />
-            <Button type="button" onClick={handleAddLinha}>
-              Adicionar
+    <div className="mx-3">
+      <Card className="max-w-md mx-auto mt-10 px-2 md:px-0">
+        <CardHeader>
+          <CardTitle>Buscar Linha de Ônibus</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="Digite o número da linha"
+                value={linhaInput}
+                onChange={(e) => setLinhaInput(e.target.value)}
+              />
+              <Button type="button" onClick={handleAddLinha}>
+                Adicionar
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {linhas.map((linha) => (
+                <Badge
+                  key={linha}
+                  onClick={() => handleRemoveLinha(linha)}
+                  className="cursor-pointer"
+                >
+                  {linha} ✕
+                </Badge>
+              ))}
+            </div>
+
+            <Button type="submit" disabled={linhas.length === 0}>
+              Iniciar Monitoramento
             </Button>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {linhas.map((linha) => (
-              <Badge
-                key={linha}
-                onClick={() => handleRemoveLinha(linha)}
-                className="cursor-pointer"
-              >
-                {linha} ✕
-              </Badge>
-            ))}
-          </div>
-
-          <Button type="submit" disabled={linhas.length === 0}>
-            Iniciar Monitoramento
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

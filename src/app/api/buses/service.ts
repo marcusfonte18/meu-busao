@@ -47,7 +47,6 @@ export async function fetchLast20SecondsBusData(
   const dataFinalFormatted = formatDate(now);
 
   const url = `${MOBILIDADE_RIO_URL}?dataInicial=${dataInicialFormatted}&dataFinal=${dataFinalFormatted}`;
-
   const response = await fetch(url);
   if (!response.ok) throw new Error("Erro ao carregar dados");
 

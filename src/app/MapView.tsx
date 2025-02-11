@@ -50,24 +50,23 @@ const BusMarkers = ({ buses }: { buses: any[] }) => {
   useEffect(() => {
     if (buses.length > 0) {
       const firstBus = buses[0];
-      map.setView([firstBus.latitude, firstBus.longitude], map.getZoom(), {
-        animate: true,
-      });
+      map.setView([firstBus.latitude, firstBus.longitude]);
     }
   }, [buses, map]);
 
   return (
     <>
-      {buses.map((bus) => (
+      {buses.map((bus: BusData) => (
         <Marker
           key={bus.id}
           position={[bus.latitude, bus.longitude]}
           icon={getBusIcon(bus.linha)}
         >
-          <Popup>
+          <Popup className="m-0">
             <div className="p-2">
               <h3 className="font-bold">Linha {bus.linha}</h3>
-              <p className="text-sm">{bus.destino}</p>
+              <p className="text-sm">Velocidade: {bus.velocidade}</p>
+              <p className="text-sm">Placa: {bus.ordem}</p>
             </div>
           </Popup>
         </Marker>
