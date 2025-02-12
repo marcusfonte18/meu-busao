@@ -65,6 +65,15 @@ const LocationButton = () => {
   const map = useMap();
   let locationMarker: any = null;
 
+  // Restaurar o estado do rastreamento ao carregar o componente
+  useEffect(() => {
+    const savedTrackingState = localStorage.getItem("isTracking");
+    if (savedTrackingState === "true") {
+      setIsTracking(true);
+      map.locate({ enableHighAccuracy: true, setView: false });
+    }
+  }, [map]);
+
   const createLocationMarker = (latlng: any, accuracy: number) => {
     if (typeof window === "undefined") return;
     const L = require("leaflet");
@@ -103,6 +112,7 @@ const LocationButton = () => {
     locationerror: () => {
       toast.error("Não foi possível obter sua localização");
       setIsTracking(false);
+      localStorage.setItem("isTracking", "false"); // Salva o estado como inativo em caso de erro
     },
   });
 
@@ -117,20 +127,24 @@ const LocationButton = () => {
       }
       toast.info("Parou de rastrear localização");
     }
-    setIsTracking(!isTracking);
+    const newTrackingState = !isTracking;
+    setIsTracking(newTrackingState);
+    localStorage.setItem("isTracking", newTrackingState.toString()); // Salva o novo estado no localStorage
   };
 
   return (
-    <div className="leaflet-bottom leaflet-right" style={{ zIndex: 999 }}>
-      <div className="leaflet-control leaflet-bar">
+    <div className="leaflet-bottom leaflet-left" style={{ zIndex: 999 }}>
+      <div className="leaflet-control leaflet-bar !border-none">
         <button
           onClick={toggleLocation}
-          className={`p-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-            isTracking ? "text-blue-500" : "text-gray-700 dark:text-gray-300"
-          }`}
+          className={`p-3 ${
+            isTracking ? "bg-blue-500" : "bg-gray-500"
+          } text-white rounded-full shadow-lg hover:${
+            isTracking ? "bg-blue-600" : "bg-gray-600"
+          } transition-colors`}
           title={isTracking ? "Parar de rastrear" : "Rastrear localização"}
         >
-          <Navigation className="h-5 w-5" />
+          <Navigation className="h-6 w-6" />
         </button>
       </div>
     </div>
