@@ -7,3 +7,13 @@ export type BusData = {
   velocidade: number;
   timestamp: string;
 };
+
+interface BusHistory {
+  position: [number, number];
+  timestamp: Date;
+  speed: number;
+}
+
+export interface BusHistoryMap {
+  [key: string]: BusHistory[];
+}

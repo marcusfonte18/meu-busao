@@ -33,7 +33,7 @@ export const InitialSearch = ({
   };
 
   return (
-    <div className="w-full min-h-[100dvh] flex items-start justify-center bg-black dark:bg-gray-900 p-4">
+    <div className="w-full min-h-[100dvh] flex items-start justify-center bg-gray-50 dark:bg-gray-900 p-4">
       <Card className="w-full max-w-md shadow-lg border-0 mt-8">
         <CardHeader className="pb-2 space-y-2">
           <CardTitle className="text-xl font-bold flex items-center">
