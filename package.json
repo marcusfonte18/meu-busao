@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@prisma/client": "^6.3.1",
+    "@prisma/client": "6.3.1",
     "@radix-ui/react-slot": "^1.1.2",
     "@tanstack/react-query": "^5.66.0",
     "class-variance-authority": "^0.7.1",
@@ -17,7 +17,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.474.0",
     "next": "15.1.6",
-    "prisma": "^6.3.1",
+    "prisma": "6.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-leaflet": "^5.0.0",

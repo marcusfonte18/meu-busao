@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@prisma/client':
-        specifier: ^6.3.1
+        specifier: 6.3.1
         version: 6.3.1(prisma@6.3.1(typescript@5.7.3))(typescript@5.7.3)
       '@radix-ui/react-slot':
         specifier: ^1.1.2
@@ -33,7 +33,7 @@ importers:
         specifier: 15.1.6
         version: 15.1.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       prisma:
-        specifier: ^6.3.1
+        specifier: 6.3.1
         version: 6.3.1(typescript@5.7.3)
       react:
         specifier: ^19.0.0
