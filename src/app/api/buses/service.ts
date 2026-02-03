@@ -3,8 +3,7 @@ import prisma from "@/lib/prisma";
 
 import { formatDate, parseCoordinate } from "@/utils";
 
-const MOBILIDADE_RIO_URL =
-  process.env.MOBILIDADE_RIO_URL || "https://dados.mobilidade.rio/gps/sppo";
+const MOBILIDADE_RIO_URL = "https://dados.mobilidade.rio/gps/sppo";
 
 function processBusData(data: any[], linhas: Array<string>): BusData[] {
   const uniqueBuses = new Map<string, BusData>();
