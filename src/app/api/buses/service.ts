@@ -56,7 +56,7 @@ export async function fetchLast20SecondsBusData(
 /** Sincroniza dados do DataRio (dados.mobilidade.rio) para o banco local. */
 export async function syncBusesFromDataRio(): Promise<{ count: number }> {
   const dataFinal = new Date();
-  const dataInicial = new Date(dataFinal.getTime() - 1 * 60 * 60 * 1000); // última 1 hora
+  const dataInicial = new Date(dataFinal.getTime() - 15 * 60 * 1000); // última 15 minutos
 
   const dataInicialFormatted = formatDate(dataInicial);
   const dataFinalFormatted = formatDate(dataFinal);
