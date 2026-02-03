@@ -38,6 +38,6 @@ export function useBusData(linhas: Array<string>) {
 
       return allBuses.current;
     },
-    refetchInterval: 5000,
+    refetchInterval: 3000,
   });
 }

@@ -19,54 +19,119 @@ const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
   ssr: false,
 });
 
-const getBusIcon = (linha: string, isSelected: boolean = false) => {
+/** Ângulo em graus (0 = Norte, 90 = Leste) a partir de dois pontos. */
+function getBearing(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const toDeg = (x: number) => (x * 180) / Math.PI;
+  const dLon = toRad(lon2 - lon1);
+  const y =
+    Math.sin(dLon) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+  let bearing = toDeg(Math.atan2(y, x));
+  return (bearing + 360) % 360;
+}
+
+/**
+ * Ícone do ônibus: bolinha em cima + seta de direção embaixo, tudo centralizado e na mesma cor.
+ * heading: graus (0 = Norte, 90 = Leste). Se undefined, mostra só um pontinho redondo.
+ */
+const getBusIcon = (
+  linha: string,
+  isSelected: boolean = false,
+  heading?: number
+) => {
   if (typeof window === "undefined") return null;
   const L = require("leaflet");
   const linhaColor = getColorForLine(linha);
+  const size = isSelected ? 40 : 32;
+  const arrowW = 20;
+  const arrowH = 14;
+  const gap = 2; // espaço entre bolinha e seta
+  const totalH = size + gap + arrowH;
+  const totalW = Math.max(size, arrowW);
+
+  // Seta aponta para cima (0°). Rotação: 90 - bearing (Norte → seta para cima).
+  const rotation = heading != null ? 90 - heading : 0;
+  const showArrow = heading != null;
 
   return new L.DivIcon({
     className: "bus-icon",
     html: `
-      <div style="
-        background-color: ${linhaColor};
-        color: white;
-        width: ${isSelected ? "40px" : "32px"};
-        height: ${isSelected ? "40px" : "32px"};
-        border-radius: 50%;
-        position: relative;
+      <div class="bus-marker-wrap" style="
+        width: ${totalW}px;
+        height: ${totalH}px;
         display: flex;
+        flex-direction: column;
         align-items: center;
-        justify-content: center;
-        font-size: ${isSelected ? "14px" : "12px"};
-        font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        border: ${isSelected ? "3px" : "2px"} solid white;
-        transition: all 0.3s ease;
-        ${isSelected ? "animation: pulse 2s infinite;" : ""}
+        justify-content: flex-start;
       ">
-        ${linha}
-        <div style="
-          position: absolute;
-          bottom: -4px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 10px;
-          height: 10px;
-          background-color: ${linhaColor};
+        <div class="bus-marker-circle" style="
+          width: ${size}px;
+          height: ${size}px;
+          min-width: ${size}px;
+          min-height: ${size}px;
           border-radius: 50%;
+          background-color: ${linhaColor};
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: ${isSelected ? "14px" : "12px"};
+          font-weight: bold;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+          border: ${isSelected ? "3px" : "2px"} solid white;
+          flex-shrink: 0;
+          ${isSelected ? "animation: bus-pulse 2s infinite;" : ""}
+        ">${linha}</div>
+        ${
+          showArrow
+            ? `
+        <div class="bus-marker-arrow" style="
+          width: ${arrowW}px;
+          height: ${arrowH}px;
+          margin-top: ${gap}px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <svg width="${arrowW}" height="${arrowH}" viewBox="0 0 20 14" style="
+            transform: rotate(${rotation}deg);
+            transform-origin: 10px 0;
+          ">
+            <path d="M10 0 L20 14 L0 14 Z" fill="${linhaColor}" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        `
+            : `
+        <div style="
+          width: 8px;
+          height: 8px;
+          margin-top: ${gap}px;
+          border-radius: 50%;
+          background-color: ${linhaColor};
           border: 2px solid white;
+          flex-shrink: 0;
         "></div>
+        `
+        }
       </div>
       <style>
-        @keyframes pulse {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-          100% { transform: scale(1); }
+        @keyframes bus-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
         }
       </style>`,
-    iconSize: isSelected ? [40, 40] : [32, 32],
-    iconAnchor: isSelected ? [20, 40] : [16, 32],
-    popupAnchor: [0, -32],
+    iconSize: [totalW, totalH],
+    iconAnchor: [totalW / 2, totalH],
+    popupAnchor: [0, -totalH],
   });
 };
 
@@ -275,17 +340,27 @@ export const BusMarkers = ({ buses }: { buses: BusData[] }) => {
     };
   };
 
+  const getHeadingForBus = (busId: string): number | undefined => {
+    const history = busHistory[busId] || [];
+    if (history.length < 2) return undefined;
+    const [prev, curr] = [history[history.length - 2], history[history.length - 1]];
+    const [lat1, lon1] = prev.position;
+    const [lat2, lon2] = curr.position;
+    return getBearing(lat1, lon1, lat2, lon2);
+  };
+
   return (
     <>
       {buses.map((bus: BusData) => {
         const isSelected = selectedBus === bus.id;
         const stats = calculateStats(bus.id);
+        const heading = getHeadingForBus(bus.id);
 
         return (
           <Marker
             key={bus.id}
             position={[bus.latitude, bus.longitude]}
-            icon={getBusIcon(bus.linha, isSelected)}
+            icon={getBusIcon(bus.linha, isSelected, heading)}
             eventHandlers={{
               click: () => setSelectedBus(isSelected ? null : bus.id),
             }}
