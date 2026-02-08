@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync": "node scripts/sync-buses.js",
+    "sync:loop": "node scripts/sync-buses.js --loop"
   },
   "dependencies": {
     "@prisma/client": "6.3.1",

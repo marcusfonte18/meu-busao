@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { QueryProvider } from "./QueryProvider";
-import { BusSyncTrigger } from "./BusSyncTrigger";
 
 export const metadata: Metadata = {
   title: "Meu Busao",
@@ -16,10 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-black">
-        <QueryProvider>
-          <BusSyncTrigger />
-          {children}
-        </QueryProvider>
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );
