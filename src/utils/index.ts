@@ -9,6 +9,12 @@ export function formatDate(date: Date): string {
   return `${year}-${month}-${day}+${hours}:${minutes}:${seconds}`;
 }
 
+/** Formata data em horário de Brasília (API DataRio pode esperar BRT). */
+export function formatDateBrazil(date: Date): string {
+  const s = date.toLocaleString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  return s.replace(" ", "+");
+}
+
 export function parseCoordinate(value: string): number {
   if (!value) return 0;
 

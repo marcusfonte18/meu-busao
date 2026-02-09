@@ -2,6 +2,8 @@
 
 Guia para rodar o projeto inteiro (incluindo o sync) em uma Droplet de US$ 4/mês.
 
+> **API DataRio e região:** a API dados.mobilidade.rio devolve dados só para IPs no Brasil. Na DigitalOcean (NYC, etc.) o sync retorna 0 ônibus. A DigitalOcean não tem datacenter no Brasil — para o sync funcionar, hospede o app em um provedor com servidor no Brasil (veja [Alternativa: servidor no Brasil](#alternativa-servidor-no-brasil) mais abaixo).
+
 ## 1. Na Droplet (primeira vez)
 
 Conecte por SSH (o IP a DigitalOcean te dá no painel):
@@ -148,6 +150,22 @@ git pull
 | `pm2 status` | Ver status do processo |
 | `pnpm run sync` | Rodar sync uma vez |
 | `pnpm run sync:loop` | Rodar sync a cada 15s (Ctrl+C para parar) |
+
+---
+
+### Alternativa: servidor no Brasil
+
+A DigitalOcean **não tem datacenter no Brasil**. Para o sync do DataRio funcionar (API só responde para IPs no Brasil), use um provedor com servidor em **São Paulo**:
+
+| Provedor | Região Brasil | Observação |
+|----------|----------------|------------|
+| **Vultr** | São Paulo | VPS barato, mesmo conceito da Droplet. [vultr.com](https://www.vultr.com) |
+| **AWS** | sa-east-1 (São Paulo) | Free tier 12 meses; depois pago. |
+| **Google Cloud** | southamerica-east1 | Créditos grátis para novos usuários. |
+| **Oracle Cloud** | São Paulo | Tem tier "sempre grátis" (exige cartão). |
+| **Locaweb, Hostinger, etc.** | Brasil | Hospedagem nacional. |
+
+O deploy é o mesmo: Node, pnpm, PM2, clone do repo, `.env`, script de deploy. Só trocar o IP/host nas instruções.
 
 ---
 

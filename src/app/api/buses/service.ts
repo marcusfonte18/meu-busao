@@ -1,7 +1,7 @@
 import { BusData } from "@/app/types";
 import prisma from "@/lib/prisma";
 
-import { formatDate, parseCoordinate } from "@/utils";
+import { formatDate, formatDateBrazil, parseCoordinate } from "@/utils";
 
 const MOBILIDADE_RIO_URL = "https://dados.mobilidade.rio/gps/sppo";
 
@@ -58,11 +58,17 @@ export async function syncBusesFromDataRio(): Promise<{ count: number }> {
   const dataFinal = new Date();
   const dataInicial = new Date(dataFinal.getTime() - 15 * 60 * 1000); // última 15 minutos
 
-  const dataInicialFormatted = formatDate(dataInicial);
-  const dataFinalFormatted = formatDate(dataFinal);
+  // API pode esperar janela em horário de Brasília
+  const dataInicialFormatted = formatDateBrazil(dataInicial);
+  const dataFinalFormatted = formatDateBrazil(dataFinal);
   const url = `${MOBILIDADE_RIO_URL}?dataInicial=${dataInicialFormatted}&dataFinal=${dataFinalFormatted}`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0",
+    },
+  });
   if (!response.ok) throw new Error("Erro ao buscar dados do DataRio");
 
   const data: Array<{

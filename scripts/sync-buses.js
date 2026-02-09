@@ -18,7 +18,11 @@ async function runSync() {
       console.error(`[${time}] Sync erro:`, data.message || res.status);
     }
   } catch (err) {
-    console.error(`[${new Date().toISOString()}] Sync falhou:`, err.message);
+    const time = new Date().toISOString();
+    console.error(`[${time}] Sync falhou:`, err.message);
+    if (err.cause?.code === "ECONNREFUSED" || err.message?.includes("fetch failed")) {
+      console.error(`   → O app está rodando? Rode "pnpm dev" em outro terminal e tente de novo.`);
+    }
   }
 }
 
