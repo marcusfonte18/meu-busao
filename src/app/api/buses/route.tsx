@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
-import { fetchBusData, fetchLast20SecondsBusData } from "./service";
+import { fetchBusData } from "./service";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const latest = searchParams.get("latest") === "true";
     const linhasParam = searchParams.get("linhas");
 
     const linhas = linhasParam ? linhasParam.split(",") : [];
 
-    const data = latest
-      ? await fetchLast20SecondsBusData(linhas)
-      : await fetchBusData(linhas);
+    // Sempre lê do banco: o sync já atualiza a cada 15s no servidor
+    const data = await fetchBusData(linhas);
 
     return NextResponse.json(data, { status: 200 });
   } catch (error) {

@@ -60,8 +60,8 @@ Salve (Ctrl+O, Enter, Ctrl+X).
 ### Rodar o deploy
 
 ```bash
-chmod +x scripts/deploy-digitalocean.sh
-./scripts/deploy-digitalocean.sh
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
 ```
 
 O app sobe na **porta 3000**. Para acessar de fora, abra a porta no firewall:
@@ -136,7 +136,7 @@ Na Droplet:
 ```bash
 cd ~/projeto/meu-busao
 git pull
-./scripts/deploy-digitalocean.sh
+./scripts/deploy.sh
 ```
 
 ---
