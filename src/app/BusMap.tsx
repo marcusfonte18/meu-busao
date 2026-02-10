@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useBusData } from "./useBusData";
-import { Bus, Loader2, X } from "lucide-react";
+import { Bus, Loader2, X, MapPin } from "lucide-react";
 import { BusMarkers } from "./MapView";
 import dynamic from "next/dynamic";
 import { Toaster } from "sonner";
@@ -25,12 +26,30 @@ const LoadingState = () => (
   </div>
 );
 
+function MapFooter() {
+  return (
+    <footer className="py-2 px-4 flex items-center justify-center gap-6 text-xs text-muted-foreground border-t border-border bg-card">
+      <Link href="/" className="hover:text-foreground transition-colors">
+        Meu Busão
+      </Link>
+      <Link href="/termos" className="hover:text-foreground transition-colors">
+        Termos
+      </Link>
+      <Link href="/privacidade" className="hover:text-foreground transition-colors">
+        Privacidade
+      </Link>
+    </footer>
+  );
+}
+
 export const BusMap = ({
   selectedLinha,
   onClearSelectedLinha,
+  onTrocarLinhas,
 }: {
   selectedLinha: Array<string>;
   onClearSelectedLinha: () => void;
+  onTrocarLinhas?: () => void;
 }) => {
   const { data: buses, isLoading } = useBusData(selectedLinha);
 
@@ -41,32 +60,47 @@ export const BusMap = ({
   return (
     <div className="w-full h-[100dvh] flex flex-col">
       <Toaster position="top-center" />
-      <Card className="flex-1 flex flex-col border-0 shadow-lg m-0 rounded-none md:m-4 md:rounded-lg">
-        <CardHeader className="pb-2 px-4 pt-4">
-          <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center justify-between">
-            <CardTitle className="text-lg sm:text-xl font-bold flex items-center flex-wrap">
-              <Bus className="h-5 w-5 mr-2 text-primary flex-shrink-0" />
-              <span className="flex-shrink-0">
-                Mapa de Ônibus em Tempo Real
+      <Card className="flex-1 flex flex-col border-0 shadow-lg m-0 rounded-none md:m-4 md:rounded-lg min-h-0">
+        <CardHeader className="pb-2 px-4 pt-4 flex-shrink-0">
+          <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-lg sm:text-xl font-bold flex items-center flex-wrap gap-2">
+              <Link
+                href="/"
+                className="flex items-center text-primary hover:opacity-80 transition-opacity"
+                title="Voltar ao início"
+              >
+                <Bus className="h-5 w-5 mr-1 flex-shrink-0" />
+                <span className="flex-shrink-0">Meu Busão</span>
+              </Link>
+              <span className="text-muted-foreground font-normal text-sm sm:text-base whitespace-nowrap">
+                – Linhas {selectedLinha.join(", ")}
               </span>
-              {selectedLinha.length > 0 && (
-                <span className="ml-2 text-muted-foreground text-sm sm:text-base whitespace-nowrap">
-                  - Linhas {selectedLinha.join(", ")}
-                </span>
-              )}
             </CardTitle>
-            <Button
-              onClick={onClearSelectedLinha}
-              variant="destructive"
-              className="w-full sm:w-auto"
-              size="sm"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Limpar Linhas
-            </Button>
+            <div className="flex gap-2 flex-shrink-0">
+              {onTrocarLinhas && (
+                <Button
+                  onClick={onTrocarLinhas}
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                  size="sm"
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Trocar linhas
+                </Button>
+              )}
+              <Button
+                onClick={onClearSelectedLinha}
+                variant="destructive"
+                className="w-full sm:w-auto"
+                size="sm"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Limpar
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 p-0">
+        <CardContent className="flex-1 p-0 min-h-0">
           <div className="h-full w-full overflow-hidden rounded-b-none md:rounded-b-lg">
             <MapContainer
               center={[-22.9068, -43.1729]}
@@ -84,6 +118,7 @@ export const BusMap = ({
           </div>
         </CardContent>
       </Card>
+      <MapFooter />
     </div>
   );
 };

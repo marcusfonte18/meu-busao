@@ -1,65 +1,76 @@
-"use client";
+import Link from "next/link";
+import { Bus, MapPin, Zap, LayoutGrid } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-import React, { useState, useEffect } from "react";
-
-import { InitialSearch } from "./InitialSearch";
-import { BusMap } from "./BusMap";
-
-const STORAGE_KEY = "meu-busao-linhas";
-
-function loadSavedLinhas(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((l) => typeof l === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLinhas(linhas: string[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(linhas));
-}
-
-export default function Home() {
-  const [selectedLine, setSelectedLine] = useState<Array<string>>([]);
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    const saved = loadSavedLinhas();
-    if (saved.length > 0) setSelectedLine(saved);
-    setHasHydrated(true);
-  }, []);
-
-  const handleSearch = (linhas: string[]) => {
-    setSelectedLine(linhas);
-    saveLinhas(linhas);
-  };
-
-  const handleClear = () => {
-    setSelectedLine([]);
-    saveLinhas([]);
-  };
-
-  if (!hasHydrated) {
-    return (
-      <div className="w-full min-h-[100dvh] flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-pulse text-muted-foreground">Carregando...</div>
-      </div>
-    );
-  }
-
-  if (selectedLine.length === 0) {
-    return <InitialSearch onSearch={handleSearch} />;
-  }
-
+function Footer() {
   return (
-    <BusMap
-      onClearSelectedLinha={handleClear}
-      selectedLinha={selectedLine}
-    />
+    <footer className="border-t border-border bg-muted/30 mt-auto">
+      <div className="container mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+        <span>© {new Date().getFullYear()} Meu Busão. Todos os direitos reservados.</span>
+        <nav className="flex gap-6">
+          <Link href="/termos" className="hover:text-foreground transition-colors">
+            Termos de uso
+          </Link>
+          <Link href="/privacidade" className="hover:text-foreground transition-colors">
+            Privacidade
+          </Link>
+        </nav>
+      </div>
+    </footer>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <div className="min-h-[100dvh] flex flex-col bg-background text-foreground">
+      <main className="flex-1 container mx-auto px-4 py-12 md:py-20">
+        <section className="text-center max-w-3xl mx-auto mb-16 md:mb-24">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 flex items-center justify-center gap-3">
+            <Bus className="h-10 w-10 md:h-12 md:w-12 text-primary" />
+            Meu Busão
+          </h1>
+          <p className="text-xl text-muted-foreground mb-8">
+            Acompanhe ônibus em tempo real no mapa. Escolha as linhas e veja onde estão agora.
+          </p>
+          <Button asChild size="lg" className="text-base">
+            <Link href="/mapa">
+              <MapPin className="h-5 w-5 mr-2" />
+              Ver mapa
+            </Link>
+          </Button>
+        </section>
+
+        <section className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto mb-16">
+          <div className="flex flex-col items-center text-center p-4 rounded-lg border border-border bg-card">
+            <Zap className="h-8 w-8 text-primary mb-3" />
+            <h2 className="font-semibold mb-1">Tempo real</h2>
+            <p className="text-sm text-muted-foreground">
+              Posições atualizadas a cada poucos segundos.
+            </p>
+          </div>
+          <div className="flex flex-col items-center text-center p-4 rounded-lg border border-border bg-card">
+            <LayoutGrid className="h-8 w-8 text-primary mb-3" />
+            <h2 className="font-semibold mb-1">Várias linhas</h2>
+            <p className="text-sm text-muted-foreground">
+              Adicione quantas linhas quiser e acompanhe no mesmo mapa.
+            </p>
+          </div>
+          <div className="flex flex-col items-center text-center p-4 rounded-lg border border-border bg-card">
+            <Bus className="h-8 w-8 text-primary mb-3" />
+            <h2 className="font-semibold mb-1">Simples</h2>
+            <p className="text-sm text-muted-foreground">
+              Sem cadastro. Digite o número da linha e comece.
+            </p>
+          </div>
+        </section>
+
+        <section className="text-center">
+          <Button asChild variant="secondary" size="lg">
+            <Link href="/mapa">Buscar linhas</Link>
+          </Button>
+        </section>
+      </main>
+      <Footer />
+    </div>
   );
 }
