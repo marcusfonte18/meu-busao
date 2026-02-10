@@ -23,8 +23,11 @@ export function useBusData(linhas: Array<string>) {
       if (!response.ok) throw new Error("Erro ao buscar dados");
 
       const data = await response.json();
-      // API já retorna a lista completa atual; substituir sempre (não somar)
-      allBuses.current = Array.isArray(data) ? data : [];
+      const list = Array.isArray(data) ? data : [];
+      // Só substitui quando vier dados; se vier vazio, mantém o último para não deixar a tela em branco
+      if (list.length > 0) {
+        allBuses.current = list;
+      }
       return allBuses.current;
     },
     refetchInterval: 3000,
