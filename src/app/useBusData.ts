@@ -23,19 +23,8 @@ export function useBusData(linhas: Array<string>) {
       if (!response.ok) throw new Error("Erro ao buscar dados");
 
       const data = await response.json();
-
-      if (allBuses.current.length === 0) {
-        allBuses.current = data;
-      } else {
-        const updatedBusesMap = new Map(
-          allBuses.current.map((bus) => [bus.id, bus])
-        );
-        data.forEach((newBus: BusData) =>
-          updatedBusesMap.set(newBus.id, newBus)
-        );
-        allBuses.current = Array.from(updatedBusesMap.values());
-      }
-
+      // API já retorna a lista completa atual; substituir sempre (não somar)
+      allBuses.current = Array.isArray(data) ? data : [];
       return allBuses.current;
     },
     refetchInterval: 3000,
