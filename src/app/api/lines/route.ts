@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
-      lines: lines.map((l) => ({ numero: l.numero, nome: l.nome })),
+      lines: lines.map((l: { numero: string; nome: string }) => ({ numero: l.numero, nome: l.nome })),
     });
   } catch (error) {
     console.error("[lines]", error);
