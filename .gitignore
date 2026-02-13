@@ -48,7 +48,6 @@ android/app/src/main/assets/capacitor.plugins.json
 android/app/src/main/res/xml/file_paths.xml
 android
 ios
-patches
 
 # dados GTFS e GeoJSON (grandes; rodar seed:lines com a pasta local)
 /gtfs_rio-de-janeiro
