@@ -5,8 +5,10 @@ import Link from "next/link";
 
 import { InitialSearch } from "../InitialSearch";
 import { BusMap } from "../BusMap";
+import type { TransportMode } from "../types";
 
 const STORAGE_KEY = "meu-busao-linhas";
+const STORAGE_MODE_KEY = "meu-busao-mode";
 const DEFAULT_CENTER = { lat: -22.9068, lng: -43.1729 } as const;
 
 function loadSavedLinhas(): string[] {
@@ -21,19 +23,31 @@ function loadSavedLinhas(): string[] {
   }
 }
 
+function loadSavedMode(): TransportMode {
+  if (typeof window === "undefined") return "onibus";
+  const m = localStorage.getItem(STORAGE_MODE_KEY);
+  return m === "brt" ? "brt" : "onibus";
+}
+
 function saveLinhas(linhas: string[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(linhas));
 }
 
+function saveMode(mode: TransportMode) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_MODE_KEY, mode);
+}
+
 export default function MapaPage() {
   const [selectedLine, setSelectedLine] = useState<Array<string>>([]);
+  const [transportMode, setTransportMode] = useState<TransportMode>("onibus");
   const [hasHydrated, setHasHydrated] = useState(false);
   const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    const saved = loadSavedLinhas();
-    if (saved.length > 0) setSelectedLine(saved);
+    setSelectedLine(loadSavedLinhas());
+    setTransportMode(loadSavedMode());
     setHasHydrated(true);
   }, []);
 
@@ -49,9 +63,11 @@ export default function MapaPage() {
     );
   }, []);
 
-  const handleSearch = (linhas: string[]) => {
+  const handleSearch = (linhas: string[], mode: TransportMode) => {
     setSelectedLine(linhas);
+    setTransportMode(mode);
     saveLinhas(linhas);
+    saveMode(mode);
   };
 
   const handleClear = () => {
@@ -78,13 +94,14 @@ export default function MapaPage() {
             ← Voltar ao início
           </Link>
         </div>
-        <InitialSearch onSearch={handleSearch} />
+        <InitialSearch mode={transportMode} onSearch={handleSearch} />
       </div>
     );
   }
 
   return (
     <BusMap
+      mode={transportMode}
       onClearSelectedLinha={handleClear}
       onTrocarLinhas={() => setSelectedLine([])}
       selectedLinha={selectedLine}

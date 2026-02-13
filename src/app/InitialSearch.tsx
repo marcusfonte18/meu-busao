@@ -7,14 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, X } from "lucide-react";
 import { BusFrontIcon } from "@/components/BusFrontIcon";
+import type { TransportMode } from "./types";
 
 type LineSuggestion = { numero: string; nome: string };
 
 export const InitialSearch = ({
+  mode: initialMode,
   onSearch,
 }: {
-  onSearch: (linhas: string[]) => void;
+  mode: TransportMode;
+  onSearch: (linhas: string[], mode: TransportMode) => void;
 }) => {
+  const [mode, setMode] = useState<TransportMode>(initialMode);
   const [linhaInput, setLinhaInput] = useState("");
   const [linhas, setLinhas] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<LineSuggestion[]>([]);
@@ -24,8 +28,12 @@ export const InitialSearch = ({
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  useEffect(() => {
     const q = linhaInput.trim();
-    if (q.length === 0) {
+    if (q.length === 0 || mode !== "onibus") {
       setSuggestions([]);
       setShowSuggestions(false);
       setLoadingSuggestions(false);
@@ -54,7 +62,7 @@ export const InitialSearch = ({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [linhaInput]);
+  }, [linhaInput, mode]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -87,7 +95,7 @@ export const InitialSearch = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (linhas.length > 0) {
-      onSearch(linhas);
+      onSearch(linhas, mode);
     }
   };
 
@@ -97,8 +105,28 @@ export const InitialSearch = ({
         <CardHeader className="pb-2 space-y-2">
           <CardTitle className="text-xl font-bold flex items-center">
             <BusFrontIcon className="h-5 w-5 mr-2 text-primary" />
-            Buscar Linha de Ônibus
+            {mode === "brt" ? "Buscar Linha BRT" : "Buscar Linha de Ônibus"}
           </CardTitle>
+          <div className="flex gap-2 pt-2">
+            <Button
+              type="button"
+              variant={mode === "onibus" ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setMode("onibus")}
+            >
+              Ônibus
+            </Button>
+            <Button
+              type="button"
+              variant={mode === "brt" ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setMode("brt")}
+            >
+              BRT
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -106,14 +134,18 @@ export const InitialSearch = ({
               <div className="flex-1 relative">
                 <Input
                   type="text"
-                  placeholder="Número ou destino (ex: 384 ou Pavuna)"
+                  placeholder={
+                    mode === "brt"
+                      ? "Número da linha BRT (ex: 35, 52)"
+                      : "Número ou destino (ex: 384 ou Pavuna)"
+                  }
                   value={linhaInput}
                   onChange={(e) => setLinhaInput(e.target.value)}
                   onFocus={() => linhaInput.trim() && setShowSuggestions(true)}
                   className="w-full"
                   autoComplete="off"
                 />
-                {showSuggestions && linhaInput.trim() && (
+                {showSuggestions && linhaInput.trim() && mode === "onibus" && (
                   <ul
                     className="absolute z-50 w-full mt-1 py-1 bg-popover border border-border rounded-md shadow-lg max-h-56 overflow-auto"
                     role="listbox"

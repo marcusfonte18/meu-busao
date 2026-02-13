@@ -8,6 +8,7 @@ import { useBusData } from "./useBusData";
 import { Loader2, X, MapPin } from "lucide-react";
 import { BusFrontIcon } from "@/components/BusFrontIcon";
 import { BusMarkers, type RouteShapesMap } from "./MapView";
+import type { TransportMode } from "./types";
 import dynamic from "next/dynamic";
 import { Toaster } from "sonner";
 
@@ -21,11 +22,13 @@ const TileLayer = dynamic(
   { ssr: false }
 );
 
-const LoadingState = () => (
+const LoadingState = ({ mode }: { mode: TransportMode }) => (
   <div className="flex justify-center items-center h-[100dvh] bg-gray-100 dark:bg-gray-900">
     <div className="text-center flex flex-col justify-center items-center space-y-4">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <p className="text-muted-foreground">Carregando dados dos ônibus...</p>
+      <p className="text-muted-foreground">
+        {mode === "brt" ? "Carregando dados do BRT..." : "Carregando dados dos ônibus..."}
+      </p>
     </div>
   </div>
 );
@@ -47,17 +50,19 @@ function MapFooter() {
 }
 
 export const BusMap = ({
+  mode = "onibus",
   selectedLinha,
   onClearSelectedLinha,
   onTrocarLinhas,
   initialCenter = [-22.9068, -43.1729],
 }: {
+  mode?: TransportMode;
   selectedLinha: Array<string>;
   onClearSelectedLinha: () => void;
   onTrocarLinhas?: () => void;
   initialCenter?: [number, number] | { lat: number; lng: number };
 }) => {
-  const { data: buses, isLoading } = useBusData(selectedLinha);
+  const { data: buses, isLoading } = useBusData(selectedLinha, mode);
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
   const center: [number, number] =
     Array.isArray(initialCenter)
@@ -65,7 +70,7 @@ export const BusMap = ({
       : [initialCenter.lat, initialCenter.lng];
 
   useEffect(() => {
-    if (selectedLinha.length === 0) {
+    if (mode !== "onibus" || selectedLinha.length === 0) {
       setRouteShapes({});
       return;
     }
@@ -75,10 +80,10 @@ export const BusMap = ({
       .then((res) => (res.ok ? res.json() : {}))
       .then((data: RouteShapesMap) => setRouteShapes(data))
       .catch(() => setRouteShapes({}));
-  }, [selectedLinha.join(",")]);
+  }, [mode, selectedLinha.join(",")]);
 
   if (isLoading || !buses || buses.length === 0) {
-    return <LoadingState />;
+    return <LoadingState mode={mode} />;
   }
 
   return (
@@ -97,7 +102,7 @@ export const BusMap = ({
                 <span className="flex-shrink-0">Meu Busão</span>
               </Link>
               <span className="text-muted-foreground font-normal text-sm sm:text-base whitespace-nowrap">
-                – Linhas {selectedLinha.join(", ")}
+                – {mode === "brt" ? "BRT" : "Ônibus"} {selectedLinha.join(", ")}
               </span>
             </CardTitle>
             <div className="flex gap-2 flex-shrink-0">

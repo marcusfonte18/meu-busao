@@ -11,6 +11,8 @@
     "lint": "next lint",
     "sync": "node scripts/sync-buses.js",
     "sync:loop": "node scripts/sync-buses.js --loop",
+    "sync:brt": "node scripts/sync-brt.js",
+    "sync:brt:loop": "node scripts/sync-brt.js --loop",
     "seed:lines": "node scripts/seed-lines.js",
     "android": "npx cap open android",
     "ios": "npx cap open ios"

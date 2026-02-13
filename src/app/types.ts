@@ -1,3 +1,5 @@
+export type TransportMode = "onibus" | "brt";
+
 export type BusData = {
   id: string;
   ordem: string;
@@ -6,6 +8,8 @@ export type BusData = {
   longitude: number;
   velocidade: number;
   timestamp: string;
+  /** Direção em graus (0 = Norte). Vindo da API BRT como "direcao". */
+  heading?: number;
 };
 
 interface BusHistory {

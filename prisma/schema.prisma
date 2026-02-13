@@ -35,3 +35,17 @@ model Line {
 
   @@map("linhas")
 }
+
+model Brt {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  codigo     String   @unique
+  placa      String?
+  linha      String
+  latitude   Float
+  longitude  Float
+  dataHora   DateTime
+  velocidade Float
+  direcao    Float?
+
+  @@map("brt")
+}

@@ -437,7 +437,7 @@ export const BusMarkers = ({
       {buses.map((bus: BusData) => {
         const isSelected = selectedBus === bus.id;
         const stats = calculateStats(bus.id);
-        const heading = getHeadingForBus(bus.id);
+        const heading = bus.heading ?? getHeadingForBus(bus.id);
         const toUser =
           userLocation &&
           estimateTimeToUser(map, userLocation, bus);
