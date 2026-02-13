@@ -18,5 +18,14 @@ pm2 start pnpm --name meu-busao -- start
 pm2 save
 pm2 startup 2>/dev/null || true
 
-echo ">>> Deploy concluído. App rodando na porta 3000."
-echo "    Logs: pm2 logs meu-busao"
+SYNC_URL="${SYNC_BASE_URL:-http://127.0.0.1:3000}"
+echo ">>> Reiniciando syncs (ônibus + BRT) com SYNC_BASE_URL=$SYNC_URL..."
+pm2 delete meu-busao-sync 2>/dev/null || true
+pm2 delete meu-busao-sync-brt 2>/dev/null || true
+pm2 start bash -c "SYNC_BASE_URL=$SYNC_URL pnpm run sync:loop" --name meu-busao-sync
+pm2 start bash -c "SYNC_BASE_URL=$SYNC_URL pnpm run sync:brt:loop" --name meu-busao-sync-brt
+pm2 save
+
+echo ">>> Deploy concluído. App na porta 3000; syncs rodando em background."
+echo "    Logs app:    pm2 logs meu-busao"
+echo "    Logs syncs:  pm2 logs meu-busao-sync meu-busao-sync-brt"
