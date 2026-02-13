@@ -1,3 +1,60 @@
+# Deploy
+
+## Deploy na Oracle Cloud com Docker (recomendado)
+
+O projeto sobe com **Docker** e **Docker Compose**: app Next.js, MongoDB (opcional), e os dois syncs (ônibus + BRT) em containers. Ideal para a VM Always Free (ex.: Ampere 4 OCPU, 24 GB).
+
+### Pré-requisitos na VM Oracle
+
+- Docker e Docker Compose instalados.
+- Porta 3000 liberada no Security List do VCN (e no firewall da VM, se usar `ufw`).
+
+### Primeira vez (clone + subir)
+
+```bash
+# Na VM
+git clone https://github.com/SEU_USUARIO/meu-busao.git
+cd meu-busao
+```
+
+Crie um `.env` na raiz do projeto (opcional):
+
+- Para usar **MongoDB no próprio container**: não defina `DATABASE_URL`; o Compose usa o serviço `database`.
+- Para usar **MongoDB Atlas**: defina `DATABASE_URL=mongodb+srv://...` no `.env`. Depois pode parar o container do banco: `docker compose stop database`.
+
+Depois:
+
+```bash
+docker compose up -d --build
+```
+
+O app fica em **http://IP_DA_VM:3000**. Os syncs sobem junto e rodam em loop.
+
+Para o **traçado da linha** aparecer no mapa, alimente o banco com os traçados uma vez (em dev, com a pasta GTFS). Veja [Traçado das linhas no mapa](#traçado-das-linhas-no-mapa) mais abaixo.
+
+### Atualizar depois de mudanças no código
+
+```bash
+cd meu-busao
+git pull
+docker compose up -d --build
+```
+
+### Comandos úteis
+
+| Comando | O que faz |
+|--------|-----------|
+| `docker compose ps` | Ver containers (app, database, sync-buses, sync-brt) |
+| `docker compose logs -f app` | Logs do app |
+| `docker compose logs -f sync-buses sync-brt` | Logs dos syncs |
+| `docker compose down` | Parar e remover os containers |
+
+### HTTPS / domínio na Oracle
+
+O app escuta na porta 3000. Para HTTPS ou domínio próprio, use **nginx** (ou Caddy) na própria VM como proxy reverso, igual ao [Passo 3 do deploy com domínio](#passo-3-na-droplet--nginx--certificado-ssl-https): instale nginx, aponte `proxy_pass` para `http://127.0.0.1:3000` e use Certbot para o certificado.
+
+---
+
 # Deploy na DigitalOcean (Droplet)
 
 Guia para rodar o projeto inteiro (incluindo o sync) em uma Droplet de US$ 4/mês.
@@ -72,6 +129,22 @@ ufw enable
 ```
 
 Acesse: `http://SEU_IP:3000`
+
+### Traçado das linhas no mapa
+
+A **linha colorida** que mostra o percurso no mapa é lida do **banco de dados** (coleção `route_shapes`). Você não precisa trafegar a pasta GTFS para produção.
+
+**Fluxo:**
+
+1. **Uma vez em dev** (onde você tem a pasta `gtfs_rio-de-janeiro`), rode o seed dos traçados:
+   ```bash
+   pnpm run seed:route-shapes
+   ```
+   Isso lê `routes.txt`, `trips.txt` e `shapes.txt`, gera as polylines por linha e grava no MongoDB.
+
+2. **Produção** usa o mesmo banco (ex.: MongoDB Atlas). Como os dados já foram inseridos em dev, em produção a API `/api/route-shapes` lê do banco e a linha aparece no mapa — não é preciso ter a pasta GTFS no servidor.
+
+Se você usar um banco diferente em produção (ex.: outro cluster Atlas), rode o seed uma vez apontando para ele: no servidor ou na sua máquina com `DATABASE_URL` do prod, execute `pnpm run seed:route-shapes` (a pasta GTFS precisa existir onde o script roda; pode ser na sua máquina com `DATABASE_URL` de produção).
 
 ---
 
@@ -188,7 +261,7 @@ sudo apt install -y certbot python3-certbot-nginx
 # Criar config (substitua 167-172-18-197 pelo SEU IP com hífens)
 echo 'server {
     listen 80;
-    server_name 167-172-18-197.sslip.io;
+    server_name 163.176.218.10.sslip.io;
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -204,7 +277,7 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
 # Certificado SSL (troque pelo seu IP com hífens)
-sudo certbot --nginx -d 167-172-18-197.sslip.io --non-interactive --agree-tos -m seu@email.com
+sudo certbot --nginx -d 163.176.218.10.sslip.io --non-interactive --agree-tos -m marcusfonte18@gmail.com
 ```
 
 Acesse **https://167-172-18-197.sslip.io** (com seu IP). Cadastro em nenhum lugar.
@@ -222,7 +295,17 @@ Acesse **https://167-172-18-197.sslip.io** (com seu IP). Cadastro em nenhum luga
 sudo apt update
 sudo apt install -y certbot python3-certbot-nginx
 
-# Troque meubusao.duckdns.org pelo subdomínio que você criou
+# Troque meubusao.duckdns.org pelo subdomínio que você crio
+
+Found the issue, needed to run:
+
+`sudo iptables -F' (flushing all iptables / firewall records)
+
+`sudo netfilter-persistent save' (saves current empty netfilter so that it doesn't add any rules on reboot)
+
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
+
 echo 'server {
     listen 80;
     server_name meu-busao.duckdns.org;
@@ -240,7 +323,7 @@ sudo ln -sf /etc/nginx/sites-available/duckdns /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
-sudo certbot --nginx -d meubusao.duckdns.org --non-interactive --agree-tos -m seu@email.com
+sudo certbot --nginx -d meu-busao.duckdns.org --non-interactive --agree-tos -m marcusfonte18@gmail.com
 ```
 
 Acesse **https://meubusao.duckdns.org**.

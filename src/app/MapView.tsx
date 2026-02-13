@@ -64,8 +64,8 @@ const getBusIcon = (
   const totalW = Math.max(size, BUS_SIDE_W);
 
   // Ônibus de lado: no SVG a frente aponta para cima (0° = Norte). Rotação = -heading.
+  // Sempre mostramos o ícone do ônibus (como no BRT); sem heading usamos 0° (Norte).
   const rotation = heading != null ? -heading : 0;
-  const showBus = heading != null;
 
   return new L.DivIcon({
     className: "bus-icon",
@@ -96,9 +96,6 @@ const getBusIcon = (
           flex-shrink: 0;
           ${isSelected ? "animation: bus-pulse 2s infinite;" : ""}
         ">${linha}</div>
-        ${
-          showBus
-            ? `
         <div class="bus-marker-side" style="
           width: ${BUS_SIDE_W}px;
           height: ${BUS_SIDE_H}px;
@@ -121,19 +118,6 @@ const getBusIcon = (
             <circle cx="18" cy="12" r="2" fill="${linhaColor}" stroke="white" stroke-width="0.8"/>
           </svg>
         </div>
-        `
-            : `
-        <div style="
-          width: 8px;
-          height: 8px;
-          margin-top: ${gap}px;
-          border-radius: 50%;
-          background-color: ${linhaColor};
-          border: 2px solid white;
-          flex-shrink: 0;
-        "></div>
-        `
-        }
       </div>
       <style>
         @keyframes bus-pulse {

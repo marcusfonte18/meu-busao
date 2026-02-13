@@ -29,9 +29,14 @@ async function runSync() {
 const loop = process.argv.includes("--loop");
 
 if (loop) {
-  runSync();
-  setInterval(runSync, INTERVAL_MS);
-  console.log(`Sync BRT rodando a cada ${INTERVAL_MS / 1000}s (Ctrl+C para parar).`);
+  // Pequeno delay para o app estar de pé antes do primeiro sync
+  const delayMs = 3000;
+  console.log(`Sync BRT iniciando em ${delayMs / 1000}s...`);
+  setTimeout(() => {
+    runSync();
+    setInterval(runSync, INTERVAL_MS);
+    console.log(`Sync BRT rodando a cada ${INTERVAL_MS / 1000}s (Ctrl+C para parar).`);
+  }, delayMs);
 } else {
   runSync();
 }

@@ -49,3 +49,11 @@ model Brt {
 
   @@map("brt")
 }
+
+/// Traçados das linhas (GTFS shapes) para desenhar no mapa. Populado por: pnpm run seed:route-shapes
+model RouteShape {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  linha     String @unique
+  polylines Json   // [ [ [lat,lng], ... ], ... ] — array de polylines por linha
+  @@map("route_shapes")
+}

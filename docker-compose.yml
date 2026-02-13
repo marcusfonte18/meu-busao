@@ -3,15 +3,45 @@ services:
     build:
       context: ./mongodb_rs
       args:
-        MONGO_VERSION: "6.0" # Substitua pela versão do MongoDB que você deseja usar
+        MONGO_VERSION: "6.0"
     container_name: database_meu_busao
     environment:
       MONGO_INITDB_ROOT_USERNAME: mongo
       MONGO_INITDB_ROOT_PASSWORD: root
       MONGO_INITDB_DATABASE: meu_busao
       MONGO_REPLICA_HOST: localhost
-      MONGO_REPLICA_PORT: 27017 #porta
-    #    volumes:
-    #      - /home/barry/mongodb/database:/data/db
+      MONGO_REPLICA_PORT: "27017"
     ports:
-      - 27017:27017
+      - "27017:27017"
+
+  app:
+    build: .
+    container_name: meu_busao_app
+    ports:
+      - "3000:3000"
+    environment:
+      # Use DATABASE_URL do .env (ex.: Atlas) ou este valor se não definir
+      DATABASE_URL: "${DATABASE_URL:-mongodb://mongo:root@database:27017/meu_busao?authSource=admin&retryWrites=true&w=majority}"
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  sync-buses:
+    build: .
+    container_name: meu_busao_sync_buses
+    command: ["node", "scripts/sync-buses.js", "--loop"]
+    environment:
+      SYNC_BASE_URL: "http://app:3000"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  sync-brt:
+    build: .
+    container_name: meu_busao_sync_brt
+    command: ["node", "scripts/sync-brt.js", "--loop"]
+    environment:
+      SYNC_BASE_URL: "http://app:3000"
+    depends_on:
+      - app
+    restart: unless-stopped

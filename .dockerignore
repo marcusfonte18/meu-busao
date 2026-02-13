@@ -1,0 +1,34 @@
+# Dependências (instaladas no build)
+node_modules
+.pnpm-store
+
+# Build local (refeito no container)
+.next
+out
+
+# App/Capacitor (não usado no servidor)
+dist
+.capacitor
+
+# Git e IDE
+.git
+.gitignore
+.cursor
+.vscode
+*.md
+!DEPLOY.md
+
+# Env local (use -e ou .env no host)
+.env
+.env.*
+!.env.example
+
+# Testes e dev
+coverage
+*.test.*
+*.spec.*
+__tests__
+ideias
+scripts/deploy*.sh
+scripts/build-app.sh
+mongodb_rs
