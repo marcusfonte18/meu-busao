@@ -19,6 +19,11 @@ const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
   ssr: false,
 });
 
+const Polyline = dynamic(
+  () => import("react-leaflet").then((mod) => mod.Polyline),
+  { ssr: false }
+);
+
 /** Ângulo em graus (0 = Norte, 90 = Leste) a partir de dois pontos. */
 function getBearing(
   lat1: number,
@@ -39,9 +44,12 @@ function getBearing(
 }
 
 /**
- * Ícone do ônibus: bolinha em cima + seta de direção embaixo, tudo centralizado e na mesma cor.
- * heading: graus (0 = Norte, 90 = Leste). Se undefined, mostra só um pontinho redondo.
+ * Ícone do ônibus no mapa: bolinha com número da linha + ônibus de lado (vista lateral)
+ * rotacionado pela direção (heading). heading: graus (0 = Norte, 90 = Leste).
  */
+const BUS_SIDE_W = 24;
+const BUS_SIDE_H = 14;
+
 const getBusIcon = (
   linha: string,
   isSelected: boolean = false,
@@ -51,15 +59,13 @@ const getBusIcon = (
   const L = require("leaflet");
   const linhaColor = getColorForLine(linha);
   const size = isSelected ? 40 : 32;
-  const arrowW = 20;
-  const arrowH = 14;
-  const gap = 2; // espaço entre bolinha e seta
-  const totalH = size + gap + arrowH;
-  const totalW = Math.max(size, arrowW);
+  const gap = 2;
+  const totalH = size + gap + BUS_SIDE_H;
+  const totalW = Math.max(size, BUS_SIDE_W);
 
-  // Seta aponta para cima (0°). Rotação: 90 - bearing (Norte → seta para cima).
-  const rotation = heading != null ? 90 - heading : 0;
-  const showArrow = heading != null;
+  // Ônibus de lado: no SVG a frente aponta para cima (0° = Norte). Rotação = -heading.
+  const rotation = heading != null ? -heading : 0;
+  const showBus = heading != null;
 
   return new L.DivIcon({
     className: "bus-icon",
@@ -91,22 +97,28 @@ const getBusIcon = (
           ${isSelected ? "animation: bus-pulse 2s infinite;" : ""}
         ">${linha}</div>
         ${
-          showArrow
+          showBus
             ? `
-        <div class="bus-marker-arrow" style="
-          width: ${arrowW}px;
-          height: ${arrowH}px;
+        <div class="bus-marker-side" style="
+          width: ${BUS_SIDE_W}px;
+          height: ${BUS_SIDE_H}px;
           margin-top: ${gap}px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
         ">
-          <svg width="${arrowW}" height="${arrowH}" viewBox="0 0 20 14" style="
+          <svg width="${BUS_SIDE_W}" height="${BUS_SIDE_H}" viewBox="0 0 24 14" style="
             transform: rotate(${rotation}deg);
-            transform-origin: 10px 0;
+            transform-origin: 12px 7px;
           ">
-            <path d="M10 0 L20 14 L0 14 Z" fill="${linhaColor}" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
+            <rect x="2" y="2" width="20" height="8" rx="1" fill="${linhaColor}" stroke="white" stroke-width="1"/>
+            <rect x="4" y="3.5" width="3" height="2" rx="0.3" fill="rgba(255,255,255,0.4)"/>
+            <rect x="8" y="3.5" width="3" height="2" rx="0.3" fill="rgba(255,255,255,0.4)"/>
+            <rect x="12" y="3.5" width="3" height="2" rx="0.3" fill="rgba(255,255,255,0.4)"/>
+            <rect x="16" y="3.5" width="3" height="2" rx="0.3" fill="rgba(255,255,255,0.4)"/>
+            <circle cx="6" cy="12" r="2" fill="${linhaColor}" stroke="white" stroke-width="0.8"/>
+            <circle cx="18" cy="12" r="2" fill="${linhaColor}" stroke="white" stroke-width="0.8"/>
           </svg>
         </div>
         `
@@ -139,6 +151,11 @@ const LocationButton = () => {
   const [isTracking, setIsTracking] = useState(false);
   const map = useMap();
   let locationMarker: any = null;
+
+  // Solicita geolocalização automaticamente ao carregar o mapa (sem precisar clicar no ícone)
+  useEffect(() => {
+    map.locate({ enableHighAccuracy: true, setView: false });
+  }, [map]);
 
   // Restaurar o estado do rastreamento ao carregar o componente
   useEffect(() => {
@@ -225,10 +242,33 @@ const LocationButton = () => {
     </div>
   );
 };
-export const BusMarkers = ({ buses }: { buses: BusData[] }) => {
+/** Distância em km e tempo estimado em min (linha reta, usando velocidade atual do ônibus). */
+function estimateTimeToUser(
+  map: { distance: (a: [number, number], b: [number, number]) => number },
+  userLatLng: [number, number],
+  bus: BusData
+): { distanceKm: number; estimatedMin: number | null } {
+  const distM = map.distance(userLatLng, [bus.latitude, bus.longitude]);
+  const distanceKm = Math.round((distM / 1000) * 10) / 10;
+  const speedKmh = Number(bus.velocidade) || 0;
+  if (speedKmh <= 0) return { distanceKm, estimatedMin: null };
+  const estimatedMin = Math.round((distanceKm / speedKmh) * 60);
+  return { distanceKm, estimatedMin };
+}
+
+export type RouteShapesMap = Record<string, [number, number][][]>;
+
+export const BusMarkers = ({
+  buses,
+  routeShapes = {},
+}: {
+  buses: BusData[];
+  routeShapes?: RouteShapesMap;
+}) => {
   const [selectedBus, setSelectedBus] = useState<string | null>(null);
   const [busHistory, setBusHistory] = useState<BusHistoryMap>({});
   const [initialViewSet, setInitialViewSet] = useState(false);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const map = useMap();
 
   // Configuração inicial do mapa - acontece apenas uma vez
@@ -252,6 +292,7 @@ export const BusMarkers = ({ buses }: { buses: BusData[] }) => {
   // Handler para quando encontrar a localização do usuário
   useMapEvents({
     locationfound: (e) => {
+      setUserLocation([e.latlng.lat, e.latlng.lng]);
       if (!initialViewSet) {
         map.setView(e.latlng, 13);
         setInitialViewSet(true);
@@ -351,10 +392,55 @@ export const BusMarkers = ({ buses }: { buses: BusData[] }) => {
 
   return (
     <>
+      {/* Traçado oficial da linha (GTFS) - contorno escuro + linha colorida */}
+      {Object.entries(routeShapes).flatMap(([linha, polylines]) => {
+        const linhaColor = getColorForLine(linha);
+        return polylines.slice(0, 2).flatMap((positions, idx) => [
+          <Polyline
+            key={`route-outline-${linha}-${idx}`}
+            positions={positions}
+            pathOptions={{
+              color: "rgba(0,0,0,0.4)",
+              weight: 6,
+              opacity: 1,
+            }}
+          />,
+          <Polyline
+            key={`route-${linha}-${idx}`}
+            positions={positions}
+            pathOptions={{
+              color: linhaColor,
+              weight: 4,
+              opacity: 0.75,
+            }}
+          />,
+        ]);
+      })}
+      {/* Trilha (caminho já percorrido) de cada ônibus */}
+      {buses.map((bus: BusData) => {
+        const history = busHistory[bus.id] || [];
+        const positions = history.map((h) => h.position as [number, number]);
+        if (positions.length < 2) return null;
+        const linhaColor = getColorForLine(bus.linha);
+        return (
+          <Polyline
+            key={`trail-${bus.id}`}
+            positions={positions}
+            pathOptions={{
+              color: linhaColor,
+              weight: 4,
+              opacity: 0.8,
+            }}
+          />
+        );
+      })}
       {buses.map((bus: BusData) => {
         const isSelected = selectedBus === bus.id;
         const stats = calculateStats(bus.id);
         const heading = getHeadingForBus(bus.id);
+        const toUser =
+          userLocation &&
+          estimateTimeToUser(map, userLocation, bus);
 
         return (
           <Marker
@@ -372,6 +458,20 @@ export const BusMarkers = ({ buses }: { buses: BusData[] }) => {
                   <h3 className="font-bold text-lg">Linha {bus.linha}</h3>
                 </div>
                 <div className="space-y-2 text-sm text-muted-foreground">
+                  {toUser != null && (
+                    <>
+                      <p className="flex items-center font-medium text-foreground">
+                        <LocateFixed className="h-4 w-4 mr-2 text-primary" />
+                        Até você: {toUser.distanceKm} km
+                        {toUser.estimatedMin != null && (
+                          <span className="ml-1">
+                            (~{toUser.estimatedMin} min em linha reta)
+                          </span>
+                        )}
+                      </p>
+                      <hr className="border-border" />
+                    </>
+                  )}
                   <p className="flex items-center">
                     <LocateFixed className="h-4 w-4 mr-2" />
                     Velocidade atual: {Number(bus.velocidade).toFixed(1)} km/h
@@ -382,7 +482,7 @@ export const BusMarkers = ({ buses }: { buses: BusData[] }) => {
                   </p>
                   <p className="flex items-center">
                     <Route className="h-4 w-4 mr-2" />
-                    Distância: {stats.distance} km
+                    Distância percorrida: {stats.distance} km
                   </p>
                   <p className="flex items-center">
                     <Bus className="h-4 w-4 mr-2" />

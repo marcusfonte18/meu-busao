@@ -27,3 +27,11 @@ model Bus {
 
   @@map("onibuses")
 }
+
+model Line {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  numero String @unique
+  nome   String
+
+  @@map("linhas")
+}

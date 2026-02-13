@@ -7,6 +7,7 @@ import { InitialSearch } from "../InitialSearch";
 import { BusMap } from "../BusMap";
 
 const STORAGE_KEY = "meu-busao-linhas";
+const DEFAULT_CENTER = { lat: -22.9068, lng: -43.1729 } as const;
 
 function loadSavedLinhas(): string[] {
   if (typeof window === "undefined") return [];
@@ -28,11 +29,24 @@ function saveLinhas(linhas: string[]) {
 export default function MapaPage() {
   const [selectedLine, setSelectedLine] = useState<Array<string>>([]);
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     const saved = loadSavedLinhas();
     if (saved.length > 0) setSelectedLine(saved);
     setHasHydrated(true);
+  }, []);
+
+  // Pede geolocalização assim que a página do mapa carrega (na tela de seleção de linhas)
+  // para o mapa já abrir na posição certa quando o usuário escolher as linhas
+  useEffect(() => {
+    if (typeof window === "undefined" || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        setInitialCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 120000, timeout: 15000 }
+    );
   }, []);
 
   const handleSearch = (linhas: string[]) => {
@@ -74,6 +88,7 @@ export default function MapaPage() {
       onClearSelectedLinha={handleClear}
       onTrocarLinhas={() => setSelectedLine([])}
       selectedLinha={selectedLine}
+      initialCenter={initialCenter ?? DEFAULT_CENTER}
     />
   );
 }

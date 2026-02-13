@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Bus, MapPin, Zap, LayoutGrid } from "lucide-react";
+import { MapPin, Zap, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BusFrontIcon } from "@/components/BusFrontIcon";
 
 function Footer() {
   return (
@@ -26,7 +27,7 @@ export default function LandingPage() {
       <main className="flex-1 container mx-auto px-4 py-12 md:py-20">
         <section className="text-center max-w-3xl mx-auto mb-16 md:mb-24">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 flex items-center justify-center gap-3">
-            <Bus className="h-10 w-10 md:h-12 md:w-12 text-primary" />
+            <BusFrontIcon className="h-10 w-10 md:h-12 md:w-12 text-primary" />
             Meu Busão
           </h1>
           <p className="text-xl text-muted-foreground mb-8">
@@ -56,7 +57,7 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="flex flex-col items-center text-center p-4 rounded-lg border border-border bg-card">
-            <Bus className="h-8 w-8 text-primary mb-3" />
+            <BusFrontIcon className="h-8 w-8 text-primary mb-3" />
             <h2 className="font-semibold mb-1">Simples</h2>
             <p className="text-sm text-muted-foreground">
               Sem cadastro. Digite o número da linha e comece.

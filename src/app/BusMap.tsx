@@ -1,9 +1,13 @@
+"use client";
+
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useBusData } from "./useBusData";
-import { Bus, Loader2, X, MapPin } from "lucide-react";
-import { BusMarkers } from "./MapView";
+import { Loader2, X, MapPin } from "lucide-react";
+import { BusFrontIcon } from "@/components/BusFrontIcon";
+import { BusMarkers, type RouteShapesMap } from "./MapView";
 import dynamic from "next/dynamic";
 import { Toaster } from "sonner";
 
@@ -46,14 +50,34 @@ export const BusMap = ({
   selectedLinha,
   onClearSelectedLinha,
   onTrocarLinhas,
+  initialCenter = [-22.9068, -43.1729],
 }: {
   selectedLinha: Array<string>;
   onClearSelectedLinha: () => void;
   onTrocarLinhas?: () => void;
+  initialCenter?: [number, number] | { lat: number; lng: number };
 }) => {
   const { data: buses, isLoading } = useBusData(selectedLinha);
+  const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
+  const center: [number, number] =
+    Array.isArray(initialCenter)
+      ? initialCenter
+      : [initialCenter.lat, initialCenter.lng];
 
-  if (isLoading || !buses) {
+  useEffect(() => {
+    if (selectedLinha.length === 0) {
+      setRouteShapes({});
+      return;
+    }
+    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    const linhas = selectedLinha.join(",");
+    fetch(`${base}/api/route-shapes?linhas=${encodeURIComponent(linhas)}`)
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((data: RouteShapesMap) => setRouteShapes(data))
+      .catch(() => setRouteShapes({}));
+  }, [selectedLinha.join(",")]);
+
+  if (isLoading || !buses || buses.length === 0) {
     return <LoadingState />;
   }
 
@@ -69,7 +93,7 @@ export const BusMap = ({
                 className="flex items-center text-primary hover:opacity-80 transition-opacity"
                 title="Voltar ao início"
               >
-                <Bus className="h-5 w-5 mr-1 flex-shrink-0" />
+                <BusFrontIcon className="h-5 w-5 mr-1 flex-shrink-0" />
                 <span className="flex-shrink-0">Meu Busão</span>
               </Link>
               <span className="text-muted-foreground font-normal text-sm sm:text-base whitespace-nowrap">
@@ -103,7 +127,7 @@ export const BusMap = ({
         <CardContent className="flex-1 p-0 min-h-0">
           <div className="h-full w-full overflow-hidden rounded-b-none md:rounded-b-lg">
             <MapContainer
-              center={[-22.9068, -43.1729]}
+              center={center}
               zoom={13}
               style={{ height: "100%", width: "100%" }}
               className="z-0"
@@ -113,7 +137,7 @@ export const BusMap = ({
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
-              <BusMarkers buses={buses} />
+              <BusMarkers buses={buses} routeShapes={routeShapes} />
             </MapContainer>
           </div>
         </CardContent>

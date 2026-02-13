@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { BusData } from "./types";
 
@@ -8,6 +8,7 @@ export function useBusData(linhas: Array<string>) {
 
   return useQuery({
     queryKey: ["buses", linhas],
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const queryParams = new URLSearchParams();
 
@@ -19,7 +20,8 @@ export function useBusData(linhas: Array<string>) {
         queryParams.append("linhas", linhas.join(","));
       }
 
-      const response = await fetch(`/api/buses?${queryParams.toString()}`);
+      const base = process.env.NEXT_PUBLIC_API_URL || "";
+      const response = await fetch(`${base}/api/buses?${queryParams.toString()}`);
       if (!response.ok) throw new Error("Erro ao buscar dados");
 
       const data = await response.json();
