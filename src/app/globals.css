@@ -92,3 +92,9 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Setas de direção nas linhas do mapa: não capturam clique */
+.direction-arrow-icon,
+.direction-arrow-icon * {
+  pointer-events: none !important;
+}

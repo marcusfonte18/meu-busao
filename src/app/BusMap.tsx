@@ -2,15 +2,32 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useBusData } from "./useBusData";
-import { Loader2, X, MapPin } from "lucide-react";
-import { BusFrontIcon } from "@/components/BusFrontIcon";
-import { BusMarkers, type RouteShapesMap } from "./MapView";
+import { Loader2 } from "lucide-react";
+import {
+  BusMarkers,
+  formatLastUpdate,
+  type RouteShapesMap,
+  type DirectionFilter,
+} from "./MapView";
+import { BusInfoPanel } from "@/components/bus-tracker/BusInfoPanel";
+import { MapHeader } from "@/components/bus-tracker/MapHeader";
 import type { TransportMode } from "./types";
 import dynamic from "next/dynamic";
 import { Toaster } from "sonner";
+
+/** Converte nome da linha (ex: "Pavuna - Passeio") em labels dos sentidos. */
+function parseDirectionLabels(nome: string): { ida: string; volta: string } {
+  const parts = nome.split(/\s*[-–/]\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      ida: `${parts[0]} → ${parts[1]}`,
+      volta: `${parts[1]} → ${parts[0]}`,
+    };
+  }
+  return { ida: "Ida", volta: "Volta" };
+}
 
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
@@ -64,6 +81,11 @@ export const BusMap = ({
 }) => {
   const { data: buses, isLoading } = useBusData(selectedLinha, mode);
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
+  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
+  const [lineDirectionLabels, setLineDirectionLabels] = useState<
+    Record<string, { ida: string; volta: string }>
+  >({});
   const center: [number, number] =
     Array.isArray(initialCenter)
       ? initialCenter
@@ -82,6 +104,26 @@ export const BusMap = ({
       .catch(() => setRouteShapes({}));
   }, [selectedLinha.join(",")]);
 
+  useEffect(() => {
+    if (selectedLinha.length === 0) {
+      setLineDirectionLabels({});
+      return;
+    }
+    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    const acc: Record<string, { ida: string; volta: string }> = {};
+    Promise.all(
+      selectedLinha.map((numero) =>
+        fetch(`${base}/api/lines?q=${encodeURIComponent(numero)}&modo=${mode}&limit=1`)
+          .then((res) => (res.ok ? res.json() : { lines: [] }))
+          .then((data: { lines: { numero: string; nome: string }[] }) => {
+            const line = data.lines?.[0];
+            if (line?.nome) acc[numero] = parseDirectionLabels(line.nome);
+            else acc[numero] = { ida: "Ida", volta: "Volta" };
+          })
+      )
+    ).then(() => setLineDirectionLabels(acc));
+  }, [selectedLinha.join(","), mode]);
+
   if (isLoading || !buses || buses.length === 0) {
     return <LoadingState mode={mode} />;
   }
@@ -90,45 +132,59 @@ export const BusMap = ({
     <div className="flex h-[100dvh] w-full flex-col">
       <Toaster position="top-center" />
       <Card className="m-0 flex min-h-0 flex-1 flex-col rounded-none border-border bg-card shadow-xl md:m-4 md:rounded-lg">
-        <CardHeader className="flex-shrink-0 border-b border-border bg-card px-4 pt-4 pb-2">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="flex flex-wrap items-center gap-2 text-lg font-bold text-foreground sm:text-xl">
-              <Link
-                href="/"
-                className="flex items-center text-primary transition-colors hover:text-primary/80"
-                title="Voltar ao início"
-              >
-                <BusFrontIcon className="mr-1 h-5 w-5 flex-shrink-0" />
-                <span className="flex-shrink-0">Meu Busão</span>
-              </Link>
-              <span className="text-sm font-normal text-muted-foreground sm:text-base whitespace-nowrap">
-                – {mode === "brt" ? "BRT" : "Ônibus"} {selectedLinha.join(", ")}
-              </span>
-            </CardTitle>
-            <div className="flex shrink-0 gap-2">
-              {onTrocarLinhas && (
-                <Button
-                  onClick={onTrocarLinhas}
-                  variant="outline"
-                  size="sm"
-                  className="border-border"
+        <MapHeader
+          lineNumbers={selectedLinha}
+          mode={mode}
+          onClear={onClearSelectedLinha}
+          onChangeLine={onTrocarLinhas ?? (() => {})}
+        />
+        {/* Filtro de sentido: ver todos ou só ida/volta */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Sentido:</span>
+          {(() => {
+            const firstLine = selectedLinha[0];
+            const labels = firstLine ? lineDirectionLabels[firstLine] : null;
+            const idaLabel = labels?.ida ?? "Ida";
+            const voltaLabel = labels?.volta ?? "Volta";
+            return (
+              <>
+                <button
+                  onClick={() => setDirectionFilter("all")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    directionFilter === "all"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  }`}
                 >
-                  <MapPin className="mr-2 h-4 w-4" />
-                  Trocar linhas
-                </Button>
-              )}
-              <Button
-                onClick={onClearSelectedLinha}
-                variant="destructive"
-                size="sm"
-              >
-                <X className="mr-2 h-4 w-4" />
-                Limpar
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1 p-0">
+                  Todos
+                </button>
+                <button
+                  onClick={() => setDirectionFilter("ida")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    directionFilter === "ida"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  }`}
+                  title={idaLabel}
+                >
+                  {idaLabel}
+                </button>
+                <button
+                  onClick={() => setDirectionFilter("volta")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    directionFilter === "volta"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  }`}
+                  title={voltaLabel}
+                >
+                  {voltaLabel}
+                </button>
+              </>
+            );
+          })()}
+        </div>
+        <CardContent className="relative min-h-0 flex-1 p-0">
           <div className="h-full w-full overflow-hidden rounded-b-none md:rounded-b-lg">
             <MapContainer
               center={center}
@@ -141,9 +197,35 @@ export const BusMap = ({
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
-              <BusMarkers buses={buses} routeShapes={routeShapes} />
+              <BusMarkers
+                buses={buses}
+                routeShapes={routeShapes}
+                mode={mode}
+                selectedBus={selectedBusId}
+                onSelectBus={setSelectedBusId}
+                directionFilter={directionFilter}
+              />
             </MapContainer>
           </div>
+          {selectedBusId && buses && (() => {
+            const bus = buses.find((b) => b.id === selectedBusId);
+            if (!bus) return null;
+            const heading = bus.heading ?? 0;
+            const speed = Math.round(Number(bus.velocidade) || 0);
+            return (
+              <div className="absolute bottom-20 left-0 right-0 z-20 flex justify-center px-4">
+                <BusInfoPanel
+                  lineNumber={bus.linha}
+                  destination={`Linha ${bus.linha}`}
+                  mode={mode}
+                  speed={speed}
+                  heading={heading}
+                  lastUpdate={formatLastUpdate(bus.timestamp)}
+                  onClose={() => setSelectedBusId(null)}
+                />
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
       <MapFooter />

@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 "use client";
 import React, { useState } from "react";
-import { Bus, Clock, LocateFixed, Navigation, Route } from "lucide-react";
 import dynamic from "next/dynamic";
 import { BusData, BusHistoryMap } from "./types";
 import { useEffect } from "react";
-import { getColorForLine } from "@/utils";
 import "leaflet/dist/leaflet.css";
 import { useMap, useMapEvents } from "react-leaflet";
 import { toast } from "sonner";
+import { Locate } from "lucide-react";
+import type { TransportMode } from "./types";
 
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
@@ -23,6 +23,64 @@ const Polyline = dynamic(
   () => import("react-leaflet").then((mod) => mod.Polyline),
   { ssr: false }
 );
+
+/** Cores do tema: primary (ônibus) e secondary (BRT) - usadas nos marcadores e nas linhas */
+const PRIMARY_COLOR = "#0d9488";
+const SECONDARY_COLOR = "#eab308";
+
+const getLineColor = (mode: TransportMode) =>
+  mode === "onibus" ? PRIMARY_COLOR : SECONDARY_COLOR;
+
+/** Opções comuns para suavidade do traço (lineCap/lineJoin arredondados) */
+const SMOOTH_PATH = { lineCap: "round" as const, lineJoin: "round" as const };
+
+/** Número de setas de direção ao longo de cada traçado */
+const DIRECTION_ARROWS_COUNT = 10;
+
+/**
+ * Amostra pontos ao longo da polyline e retorna posição + ângulo (direção do percurso).
+ * Usado para desenhar flechas indicando o sentido da linha.
+ */
+function sampleDirectionArrows(
+  positions: [number, number][],
+  maxArrows: number = DIRECTION_ARROWS_COUNT
+): { lat: number; lng: number; angle: number }[] {
+  if (positions.length < 2) return [];
+  const result: { lat: number; lng: number; angle: number }[] = [];
+  const step = (positions.length - 1) / (maxArrows + 1);
+  for (let k = 1; k <= maxArrows; k++) {
+    const i = Math.min(Math.floor(k * step), positions.length - 2);
+    const [lat, lng] = positions[i];
+    const [nextLat, nextLng] = positions[i + 1];
+    const angle = getBearing(lat, lng, nextLat, nextLng);
+    result.push({ lat, lng, angle });
+  }
+  return result;
+}
+
+/**
+ * Ícone de seta (triângulo) para indicar direção da linha. angle em graus (0 = Norte).
+ * Usa SVG em data URL para renderização estável no Leaflet.
+ */
+function getDirectionArrowIcon(angleDeg: number, color: string) {
+  if (typeof window === "undefined") return null;
+  const L = require("leaflet");
+  const size = 20;
+  const center = size / 2;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <g transform="rotate(${angleDeg} ${center} ${center})">
+        <path d="M${center} 4 L${size - 4} ${size - 4} L8 ${size - 4} Z" fill="${color}" stroke="rgba(0,0,0,0.25)" stroke-width="0.8"/>
+      </g>
+    </svg>`;
+  const encoded = encodeURIComponent(svg.trim()).replace(/'/g, "%27");
+  return new L.DivIcon({
+    className: "direction-arrow-icon",
+    html: `<img src="data:image/svg+xml,${encoded}" width="${size}" height="${size}" alt="" />`,
+    iconSize: [size, size],
+    iconAnchor: [center, center],
+  });
+}
 
 /** Ângulo em graus (0 = Norte, 90 = Leste) a partir de dois pontos. */
 function getBearing(
@@ -43,88 +101,171 @@ function getBearing(
   return (bearing + 360) % 360;
 }
 
-/**
- * Ícone do ônibus no mapa: bolinha com número da linha + ônibus de lado (vista lateral)
- * rotacionado pela direção (heading). heading: graus (0 = Norte, 90 = Leste).
- */
-const BUS_SIDE_W = 24;
-const BUS_SIDE_H = 14;
+/** Diferença angular em graus (0..180). */
+function angleDiff(a: number, b: number): number {
+  let d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
 
+/** Distância mínima (ao quadrado) de um ponto a uma polyline (aproximação em graus). */
+function minDistSqToPolyline(
+  lat: number,
+  lng: number,
+  positions: [number, number][]
+): number {
+  if (positions.length === 0) return Infinity;
+  let minSq = Infinity;
+  for (let i = 0; i < positions.length - 1; i++) {
+    const [a0, a1] = positions[i];
+    const [b0, b1] = positions[i + 1];
+    const t = Math.max(
+      0,
+      Math.min(
+        1,
+        ((lat - a0) * (b0 - a0) + (lng - a1) * (b1 - a1)) /
+          (((b0 - a0) ** 2 + (b1 - a1) ** 2) || 1)
+      )
+    );
+    const p0 = a0 + t * (b0 - a0);
+    const p1 = a1 + t * (b1 - a1);
+    const sq = (lat - p0) ** 2 + (lng - p1) ** 2;
+    if (sq < minSq) minSq = sq;
+  }
+  return minSq;
+}
+
+/** Bearing do segmento da polyline mais próximo do ponto. */
+function getClosestSegmentBearing(
+  positions: [number, number][],
+  lat: number,
+  lng: number
+): number | null {
+  if (positions.length < 2) return null;
+  let minSq = Infinity;
+  let bearing = 0;
+  for (let i = 0; i < positions.length - 1; i++) {
+    const [a0, a1] = positions[i];
+    const [b0, b1] = positions[i + 1];
+    const t = Math.max(
+      0,
+      Math.min(
+        1,
+        ((lat - a0) * (b0 - a0) + (lng - a1) * (b1 - a1)) /
+          (((b0 - a0) ** 2 + (b1 - a1) ** 2) || 1)
+      )
+    );
+    const p0 = a0 + t * (b0 - a0);
+    const p1 = a1 + t * (b1 - a1);
+    const sq = (lat - p0) ** 2 + (lng - p1) ** 2;
+    if (sq < minSq) {
+      minSq = sq;
+      bearing = getBearing(a0, a1, b0, b1);
+    }
+  }
+  return bearing;
+}
+
+/**
+ * Estima se o ônibus está em sentido ida (polyline 0) ou volta (polyline 1)
+ * usando posição e, se existir, heading. Retorna null se não der para definir.
+ */
+export function estimateBusSentido(
+  bus: BusData,
+  polylines: [number, number][][] | undefined,
+  headingDeg: number | undefined
+): "ida" | "volta" | null {
+  if (!polylines || polylines.length < 2) return null;
+  const [poly0, poly1] = polylines;
+  if (poly0.length < 2 || poly1.length < 2) return null;
+
+  const bearing0 = getClosestSegmentBearing(poly0, bus.latitude, bus.longitude);
+  const bearing1 = getClosestSegmentBearing(poly1, bus.latitude, bus.longitude);
+  if (bearing0 == null || bearing1 == null) return null;
+
+  if (headingDeg != null && !Number.isNaN(headingDeg)) {
+    const diff0 = angleDiff(headingDeg, bearing0);
+    const diff1 = angleDiff(headingDeg, bearing1);
+    return diff0 <= diff1 ? "ida" : "volta";
+  }
+
+  const dist0 = minDistSqToPolyline(bus.latitude, bus.longitude, poly0);
+  const dist1 = minDistSqToPolyline(bus.latitude, bus.longitude, poly1);
+  return dist0 <= dist1 ? "ida" : "volta";
+}
+
+/**
+ * Ícone do ônibus: círculo com número + triângulo (estilo BusTracker Rio).
+ * mode: onibus = primary (teal), brt = secondary (laranja).
+ */
 const getBusIcon = (
   linha: string,
-  isSelected: boolean = false,
-  heading?: number
+  mode: TransportMode,
+  isSelected: boolean,
+  speed?: number,
+  _heading?: number
 ) => {
   if (typeof window === "undefined") return null;
   const L = require("leaflet");
-  const linhaColor = getColorForLine(linha);
+  const fillColor = mode === "onibus" ? PRIMARY_COLOR : SECONDARY_COLOR;
   const size = isSelected ? 40 : 32;
   const gap = 2;
-  const totalH = size + gap + BUS_SIDE_H;
-  const totalW = Math.max(size, BUS_SIDE_W);
+  const triangleH = 6;
+  const totalH = (isSelected && speed !== undefined ? 14 : 0) + size + gap + triangleH;
+  const totalW = Math.max(size, 40);
 
-  // Ônibus de lado: no SVG a frente aponta para cima (0° = Norte). Rotação = -heading.
-  // Sempre mostramos o ícone do ônibus (como no BRT); sem heading usamos 0° (Norte).
-  const rotation = heading != null ? -heading : 0;
+  const speedBadge =
+    isSelected && speed !== undefined
+      ? `<span style="
+          display:inline-block;
+          border-radius:4px;
+          background:rgba(0,0,0,0.8);
+          color:#fff;
+          padding:2px 6px;
+          font-size:9px;
+          font-weight:700;
+          margin-bottom:2px;
+        ">${Math.round(speed)} km/h</span>`
+      : "";
 
   return new L.DivIcon({
     className: "bus-icon",
     html: `
-      <div class="bus-marker-wrap" style="
-        width: ${totalW}px;
-        height: ${totalH}px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-start;
+      <div style="
+        width:${totalW}px;
+        height:${totalH}px;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:flex-start;
       ">
-        <div class="bus-marker-circle" style="
-          width: ${size}px;
-          height: ${size}px;
-          min-width: ${size}px;
-          min-height: ${size}px;
-          border-radius: 50%;
-          background-color: ${linhaColor};
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: ${isSelected ? "14px" : "12px"};
-          font-weight: bold;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-          border: ${isSelected ? "3px" : "2px"} solid white;
-          flex-shrink: 0;
-          ${isSelected ? "animation: bus-pulse 2s infinite;" : ""}
+        ${speedBadge}
+        <div style="
+          width:${size}px;
+          height:${size}px;
+          min-width:${size}px;
+          min-height:${size}px;
+          border-radius:50%;
+          background-color:${fillColor};
+          color:#fff;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-size:${isSelected ? "14px" : "12px"};
+          font-weight:bold;
+          box-shadow:0 4px 14px rgba(0,0,0,0.25);
+          border:2px solid #fff;
+          flex-shrink:0;
+          ${isSelected ? "box-shadow:0 0 0 4px " + fillColor + "40;" : ""}
         ">${linha}</div>
-        <div class="bus-marker-side" style="
-          width: ${BUS_SIDE_W}px;
-          height: ${BUS_SIDE_H}px;
-          margin-top: ${gap}px;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
-          <svg width="${BUS_SIDE_W}" height="${BUS_SIDE_H}" viewBox="0 0 24 14" style="
-            transform: rotate(${rotation}deg);
-            transform-origin: 12px 7px;
-          ">
-            <rect x="2" y="2" width="20" height="8" rx="1" fill="${linhaColor}" stroke="white" stroke-width="1"/>
-            <rect x="4" y="3.5" width="3" height="2" rx="0.3" fill="rgba(255,255,255,0.4)"/>
-            <rect x="8" y="3.5" width="3" height="2" rx="0.3" fill="rgba(255,255,255,0.4)"/>
-            <rect x="12" y="3.5" width="3" height="2" rx="0.3" fill="rgba(255,255,255,0.4)"/>
-            <rect x="16" y="3.5" width="3" height="2" rx="0.3" fill="rgba(255,255,255,0.4)"/>
-            <circle cx="6" cy="12" r="2" fill="${linhaColor}" stroke="white" stroke-width="0.8"/>
-            <circle cx="18" cy="12" r="2" fill="${linhaColor}" stroke="white" stroke-width="0.8"/>
-          </svg>
-        </div>
-      </div>
-      <style>
-        @keyframes bus-pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.08); }
-        }
-      </style>`,
+        <div style="
+          width:0;
+          height:0;
+          margin-top:${gap}px;
+          border-left:5px solid transparent;
+          border-right:5px solid transparent;
+          border-top:${triangleH}px solid ${fillColor};
+        "></div>
+      </div>`,
     iconSize: [totalW, totalH],
     iconAnchor: [totalW / 2, totalH],
     popupAnchor: [0, -totalH],
@@ -209,18 +350,14 @@ const LocationButton = () => {
   };
 
   return (
-    <div className="leaflet-bottom leaflet-left" style={{ zIndex: 999 }}>
+    <div className="leaflet-top leaflet-right" style={{ zIndex: 999 }}>
       <div className="leaflet-control leaflet-bar !border-none">
         <button
           onClick={toggleLocation}
-          className={`p-3 ${
-            isTracking ? "bg-blue-500" : "bg-gray-500"
-          } text-white rounded-full shadow-lg hover:${
-            isTracking ? "bg-blue-600" : "bg-gray-600"
-          } transition-colors`}
+          className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-colors hover:bg-primary/90"
           title={isTracking ? "Parar de rastrear" : "Rastrear localização"}
         >
-          <Navigation className="h-6 w-6" />
+          <Locate className="h-5 w-5" />
         </button>
       </div>
     </div>
@@ -242,14 +379,39 @@ function estimateTimeToUser(
 
 export type RouteShapesMap = Record<string, [number, number][][]>;
 
+export function formatLastUpdate(timestamp: string): string {
+  try {
+    const d = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "agora";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} min atrás`;
+    const diffH = Math.floor(diffMin / 60);
+    return `${diffH}h atrás`;
+  } catch {
+    return "—";
+  }
+}
+
+export type DirectionFilter = "all" | "ida" | "volta";
+
 export const BusMarkers = ({
   buses,
   routeShapes = {},
+  mode = "onibus",
+  selectedBus,
+  onSelectBus,
+  directionFilter = "all",
 }: {
   buses: BusData[];
   routeShapes?: RouteShapesMap;
+  mode?: TransportMode;
+  selectedBus: string | null;
+  onSelectBus: (id: string | null) => void;
+  directionFilter?: DirectionFilter;
 }) => {
-  const [selectedBus, setSelectedBus] = useState<string | null>(null);
   const [busHistory, setBusHistory] = useState<BusHistoryMap>({});
   const [initialViewSet, setInitialViewSet] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
@@ -374,108 +536,99 @@ export const BusMarkers = ({
     return getBearing(lat1, lon1, lat2, lon2);
   };
 
+  const busesToShow =
+    directionFilter === "all"
+      ? buses
+      : buses.filter(
+          (bus) =>
+            estimateBusSentido(
+              bus,
+              routeShapes[bus.linha],
+              bus.heading ?? getHeadingForBus(bus.id)
+            ) === directionFilter
+        );
+
   return (
     <>
-      {/* Traçado oficial da linha (GTFS) - contorno escuro + linha colorida */}
+      {/* Traçado oficial da linha (GTFS): ida = traço contínuo, volta = tracejado + setas de direção */}
       {Object.entries(routeShapes).flatMap(([linha, polylines]) => {
-        const linhaColor = getColorForLine(linha);
-        return polylines.slice(0, 2).flatMap((positions, idx) => [
-          <Polyline
-            key={`route-outline-${linha}-${idx}`}
-            positions={positions}
-            pathOptions={{
-              color: "rgba(0,0,0,0.4)",
-              weight: 6,
-              opacity: 1,
-            }}
-          />,
-          <Polyline
-            key={`route-${linha}-${idx}`}
-            positions={positions}
-            pathOptions={{
-              color: linhaColor,
-              weight: 4,
-              opacity: 0.75,
-            }}
-          />,
-        ]);
+        const lineColor = getLineColor(mode);
+        return polylines.slice(0, 2).flatMap((positions, idx) => {
+          const isVolta = idx === 1;
+          const dash = isVolta ? "12, 8" : undefined;
+          const arrowPoints = sampleDirectionArrows(positions);
+          const lineKey = `route-${linha}-${idx}`;
+          return [
+            <Polyline
+              key={`route-outline-${linha}-${idx}`}
+              positions={positions}
+              pathOptions={{
+                color: "rgba(0,0,0,0.35)",
+                weight: 8,
+                opacity: 1,
+                dashArray: dash,
+                ...SMOOTH_PATH,
+              }}
+            />,
+            <Polyline
+              key={lineKey}
+              positions={positions}
+              pathOptions={{
+                color: lineColor,
+                weight: 5,
+                opacity: 0.9,
+                dashArray: dash,
+                ...SMOOTH_PATH,
+              }}
+            />,
+            ...arrowPoints.flatMap((p, ai) => {
+              const icon = getDirectionArrowIcon(p.angle, lineColor);
+              if (!icon) return [];
+              return [
+                <Marker
+                  key={`${lineKey}-arrow-${ai}`}
+                  position={[p.lat, p.lng]}
+                  icon={icon}
+                  interactive={false}
+                />,
+              ];
+            }),
+          ];
+        });
       })}
-      {/* Trilha (caminho já percorrido) de cada ônibus */}
-      {buses.map((bus: BusData) => {
+      {/* Trilha (caminho já percorrido) de cada ônibus - mesma cor e suavidade */}
+      {busesToShow.map((bus: BusData) => {
         const history = busHistory[bus.id] || [];
         const positions = history.map((h) => h.position as [number, number]);
         if (positions.length < 2) return null;
-        const linhaColor = getColorForLine(bus.linha);
+        const lineColor = getLineColor(mode);
         return (
           <Polyline
             key={`trail-${bus.id}`}
             positions={positions}
             pathOptions={{
-              color: linhaColor,
+              color: lineColor,
               weight: 4,
-              opacity: 0.8,
+              opacity: 0.85,
+              ...SMOOTH_PATH,
             }}
           />
         );
       })}
-      {buses.map((bus: BusData) => {
+      {busesToShow.map((bus: BusData) => {
         const isSelected = selectedBus === bus.id;
-        const stats = calculateStats(bus.id);
-        const heading = bus.heading ?? getHeadingForBus(bus.id);
-        const toUser =
-          userLocation &&
-          estimateTimeToUser(map, userLocation, bus);
+        const heading = bus.heading ?? getHeadingForBus(bus.id) ?? 0;
+        const speed = Number(bus.velocidade) || 0;
 
         return (
           <Marker
             key={bus.id}
             position={[bus.latitude, bus.longitude]}
-            icon={getBusIcon(bus.linha, isSelected, heading)}
+            icon={getBusIcon(bus.linha, mode, isSelected, speed, heading)}
             eventHandlers={{
-              click: () => setSelectedBus(isSelected ? null : bus.id),
+              click: () => onSelectBus(isSelected ? null : bus.id),
             }}
-          >
-            <Popup className="rounded-lg shadow-lg">
-              <div className="p-4 bg-white dark:bg-gray-800 min-w-[240px]">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Bus className="h-5 w-5 text-primary" />
-                  <h3 className="font-bold text-lg">Linha {bus.linha}</h3>
-                </div>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  {toUser != null && (
-                    <>
-                      <p className="flex items-center font-medium text-foreground">
-                        <LocateFixed className="h-4 w-4 mr-2 text-primary" />
-                        Até você: {toUser.distanceKm} km
-                        {toUser.estimatedMin != null && (
-                          <span className="ml-1">
-                            (~{toUser.estimatedMin} min em linha reta)
-                          </span>
-                        )}
-                      </p>
-                      <hr className="border-border" />
-                    </>
-                  )}
-                  <p className="flex items-center">
-                    <LocateFixed className="h-4 w-4 mr-2" />
-                    Velocidade atual: {Number(bus.velocidade).toFixed(1)} km/h
-                  </p>
-                  <p className="flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Velocidade média: {stats.avgSpeed} km/h
-                  </p>
-                  <p className="flex items-center">
-                    <Route className="h-4 w-4 mr-2" />
-                    Distância percorrida: {stats.distance} km
-                  </p>
-                  <p className="flex items-center">
-                    <Bus className="h-4 w-4 mr-2" />
-                    Placa: {bus.ordem}
-                  </p>
-                </div>
-              </div>
-            </Popup>
-          </Marker>
+          />
         );
       })}
       <LocationButton />

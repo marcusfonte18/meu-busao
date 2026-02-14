@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 
 import { InitialSearch } from "./InitialSearch";
 import { BusMap } from "./BusMap";
+import { BottomNav } from "@/components/bus-tracker/BottomNav";
 import type { TransportMode } from "./types";
 
 const STORAGE_KEY = "meu-busao-linhas";
@@ -82,19 +83,31 @@ export default function HomePage() {
 
   if (selectedLine.length === 0) {
     return (
-      <div className="min-h-[100dvh] flex flex-col">
-        <InitialSearch mode="onibus" onSearch={handleSearch} />
-      </div>
+      <>
+        <div className="flex min-h-[100dvh] flex-col pb-20">
+          <InitialSearch mode="onibus" onSearch={handleSearch} />
+        </div>
+        <BottomNav active="buscar" />
+      </>
     );
   }
 
   return (
-    <BusMap
-      mode={transportMode}
-      onClearSelectedLinha={handleClear}
-      onTrocarLinhas={() => setSelectedLine([])}
-      selectedLinha={selectedLine}
-      initialCenter={initialCenter ?? DEFAULT_CENTER}
-    />
+    <>
+      <BusMap
+        mode={transportMode}
+        onClearSelectedLinha={handleClear}
+        onTrocarLinhas={() => setSelectedLine([])}
+        selectedLinha={selectedLine}
+        initialCenter={initialCenter ?? DEFAULT_CENTER}
+      />
+      <BottomNav
+        active="mapa"
+        onBuscarClick={() => {
+          setSelectedLine([]);
+          saveLinhas([]);
+        }}
+      />
+    </>
   );
 }
