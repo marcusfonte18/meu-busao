@@ -1,8 +1,32 @@
 #!/usr/bin/env bash
-# Rode na VM (Oracle, DigitalOcean, etc.): cd ~/projetos/meu-busao && ./scripts/deploy.sh
+# Deploy na Oracle (ou outra VM): execute apenas este script a partir da pasta do projeto.
+# Ex.: cd ~/projetos/meu-busao && ./scripts/deploy.sh
+# Ou de qualquer pasta: bash /caminho/para/meu-busao/scripts/deploy.sh
 set -e
-cd "$(dirname "$0")/.."
 
+# Ir para a raiz do projeto (onde está package.json)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+# Carregar nvm se existir (Oracle/VM costumam usar nvm; em script não-interativo o PATH pode não ter node)
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  set +e
+  . "$NVM_DIR/nvm.sh"
+  set -e
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo ">>> Erro: pnpm não encontrado. Instale Node e pnpm ou carregue o nvm (ex.: source ~/.nvm/nvm.sh)."
+  exit 1
+fi
+
+if [ ! -f .env ]; then
+  echo ">>> Aviso: arquivo .env não encontrado. Crie um com DATABASE_URL (e SYNC_BASE_URL se precisar)."
+fi
+
+echo ">>> Projeto: $PROJECT_ROOT"
 echo ">>> Atualizando código (git pull)..."
 git pull || true
 
@@ -14,6 +38,11 @@ pnpm prisma generate
 
 echo ">>> Build do Next.js..."
 pnpm build
+
+if ! command -v pm2 >/dev/null 2>&1; then
+  echo ">>> Erro: pm2 não encontrado. Instale com: npm install -g pm2"
+  exit 1
+fi
 
 echo ">>> Reiniciando app com PM2..."
 pm2 delete meu-busao 2>/dev/null || true
