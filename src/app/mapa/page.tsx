@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { InitialSearch } from "../InitialSearch";
 import { BusMap } from "../BusMap";
+import { SearchHeroBg } from "@/components/SearchHeroBg";
 import type { TransportMode } from "../types";
 
 const STORAGE_KEY = "meu-busao-linhas";
@@ -77,24 +78,25 @@ export default function MapaPage() {
 
   if (!hasHydrated) {
     return (
-      <div className="w-full min-h-[100dvh] flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-pulse text-muted-foreground">Carregando...</div>
+      <div className="relative w-full min-h-[100dvh] flex items-center justify-center search-hero-bg overflow-hidden">
+        <SearchHeroBg />
+        <div className="relative z-10 animate-pulse text-white/80">Carregando...</div>
       </div>
     );
   }
 
   if (selectedLine.length === 0) {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-gray-50 dark:bg-gray-900">
-        <div className="p-4">
+      <div className="min-h-[100dvh] flex flex-col relative">
+        <div className="absolute top-4 left-4 z-20">
           <Link
             href="/"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-white/80 hover:text-white transition-colors inline-flex items-center gap-1"
           >
             ← Voltar ao início
           </Link>
         </div>
-        <InitialSearch mode={transportMode} onSearch={handleSearch} />
+        <InitialSearch mode="onibus" onSearch={handleSearch} />
       </div>
     );
   }

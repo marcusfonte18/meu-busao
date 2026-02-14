@@ -1,3 +1,12 @@
+/** Remove acentos para busca (ex.: "São Paulo" → "sao paulo"). */
+export function normalizeForSearch(str: string): string {
+  if (!str || typeof str !== "string") return "";
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export function formatDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");

@@ -8,6 +8,7 @@ import { useBusData } from "./useBusData";
 import { Loader2, X, MapPin } from "lucide-react";
 import { BusFrontIcon } from "@/components/BusFrontIcon";
 import { BusMarkers, type RouteShapesMap } from "./MapView";
+import { SearchHeroBg } from "@/components/SearchHeroBg";
 import type { TransportMode } from "./types";
 import dynamic from "next/dynamic";
 import { Toaster } from "sonner";
@@ -23,10 +24,11 @@ const TileLayer = dynamic(
 );
 
 const LoadingState = ({ mode }: { mode: TransportMode }) => (
-  <div className="flex justify-center items-center h-[100dvh] bg-gray-100 dark:bg-gray-900">
-    <div className="text-center flex flex-col justify-center items-center space-y-4">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <p className="text-muted-foreground">
+  <div className="relative flex justify-center items-center h-[100dvh] search-hero-bg overflow-hidden">
+    <SearchHeroBg />
+    <div className="relative z-10 text-center flex flex-col justify-center items-center space-y-4">
+      <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+      <p className="text-white/80">
         {mode === "brt" ? "Carregando dados do BRT..." : "Carregando dados dos ônibus..."}
       </p>
     </div>
@@ -35,14 +37,14 @@ const LoadingState = ({ mode }: { mode: TransportMode }) => (
 
 function MapFooter() {
   return (
-    <footer className="py-2 px-4 flex items-center justify-center gap-6 text-xs text-muted-foreground border-t border-border bg-card">
-      <Link href="/" className="hover:text-foreground transition-colors">
+    <footer className="py-2 px-4 flex items-center justify-center gap-6 text-xs text-white/60 border-t border-white/10 bg-slate-900/80">
+      <Link href="/" className="hover:text-white transition-colors">
         Meu Busão
       </Link>
-      <Link href="/termos" className="hover:text-foreground transition-colors">
+      <Link href="/termos" className="hover:text-white transition-colors">
         Termos
       </Link>
-      <Link href="/privacidade" className="hover:text-foreground transition-colors">
+      <Link href="/privacidade" className="hover:text-white transition-colors">
         Privacidade
       </Link>
     </footer>
@@ -70,7 +72,7 @@ export const BusMap = ({
       : [initialCenter.lat, initialCenter.lng];
 
   useEffect(() => {
-    if (mode !== "onibus" || selectedLinha.length === 0) {
+    if (selectedLinha.length === 0) {
       setRouteShapes({});
       return;
     }
@@ -80,7 +82,7 @@ export const BusMap = ({
       .then((res) => (res.ok ? res.json() : {}))
       .then((data: RouteShapesMap) => setRouteShapes(data))
       .catch(() => setRouteShapes({}));
-  }, [mode, selectedLinha.join(",")]);
+  }, [selectedLinha.join(",")]);
 
   if (isLoading || !buses || buses.length === 0) {
     return <LoadingState mode={mode} />;
@@ -89,19 +91,19 @@ export const BusMap = ({
   return (
     <div className="w-full h-[100dvh] flex flex-col">
       <Toaster position="top-center" />
-      <Card className="flex-1 flex flex-col border-0 shadow-lg m-0 rounded-none md:m-4 md:rounded-lg min-h-0">
-        <CardHeader className="pb-2 px-4 pt-4 flex-shrink-0">
+      <Card className="flex-1 flex flex-col border-0 shadow-xl m-0 rounded-none md:m-4 md:rounded-lg min-h-0 bg-slate-900/95 border-b border-white/10">
+        <CardHeader className="pb-2 px-4 pt-4 flex-shrink-0 bg-slate-900/95">
           <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center justify-between gap-2">
-            <CardTitle className="text-lg sm:text-xl font-bold flex items-center flex-wrap gap-2">
+            <CardTitle className="text-lg sm:text-xl font-bold flex items-center flex-wrap gap-2 text-white">
               <Link
                 href="/"
-                className="flex items-center text-primary hover:opacity-80 transition-opacity"
+                className="flex items-center text-blue-300 hover:text-blue-200 transition-colors"
                 title="Voltar ao início"
               >
                 <BusFrontIcon className="h-5 w-5 mr-1 flex-shrink-0" />
                 <span className="flex-shrink-0">Meu Busão</span>
               </Link>
-              <span className="text-muted-foreground font-normal text-sm sm:text-base whitespace-nowrap">
+              <span className="text-white/60 font-normal text-sm sm:text-base whitespace-nowrap">
                 – {mode === "brt" ? "BRT" : "Ônibus"} {selectedLinha.join(", ")}
               </span>
             </CardTitle>
@@ -109,8 +111,7 @@ export const BusMap = ({
               {onTrocarLinhas && (
                 <Button
                   onClick={onTrocarLinhas}
-                  variant="secondary"
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20"
                   size="sm"
                 >
                   <MapPin className="h-4 w-4 mr-2" />
@@ -119,8 +120,7 @@ export const BusMap = ({
               )}
               <Button
                 onClick={onClearSelectedLinha}
-                variant="destructive"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-400/30"
                 size="sm"
               >
                 <X className="h-4 w-4 mr-2" />

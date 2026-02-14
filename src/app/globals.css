@@ -64,3 +64,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Tela de busca: linhas azuis luminosas (estilo Hartmann) */
+.search-hero-bg {
+  background: linear-gradient(180deg, #0a0e1a 0%, #0d1424 50%, #0a0e1a 100%);
+}
+.search-hero-glow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}

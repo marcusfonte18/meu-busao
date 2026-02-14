@@ -29,9 +29,12 @@ model Bus {
 }
 
 model Line {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId
-  numero String @unique
-  nome   String
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  numero       String @unique
+  nome         String
+  tipo         String // "onibus" | "brt" — do GTFS (route_type, agency, nome)
+  numeroSearch String // lowercase, sem acentos — para busca
+  nomeSearch   String // lowercase, sem acentos — para busca
 
   @@map("linhas")
 }
