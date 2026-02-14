@@ -9,6 +9,7 @@ import { useMap, useMapEvents } from "react-leaflet";
 import { toast } from "sonner";
 import { Locate } from "lucide-react";
 import type { TransportMode } from "./types";
+import { getLineColorHex } from "@/components/bus-tracker/bus-marker";
 
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
@@ -24,12 +25,8 @@ const Polyline = dynamic(
   { ssr: false }
 );
 
-/** Cores do tema: primary (ônibus) e secondary (BRT) - usadas nos marcadores e nas linhas */
-const PRIMARY_COLOR = "#0d9488";
+/** Cores do tema: secondary (BRT). Ônibus usa getLineColorHex (teal/roxo por linha). */
 const SECONDARY_COLOR = "#eab308";
-
-const getLineColor = (mode: TransportMode) =>
-  mode === "onibus" ? PRIMARY_COLOR : SECONDARY_COLOR;
 
 /** Opções comuns para suavidade do traço (lineCap/lineJoin arredondados) */
 const SMOOTH_PATH = { lineCap: "round" as const, lineJoin: "round" as const };
@@ -134,6 +131,15 @@ function minDistSqToPolyline(
   return minSq;
 }
 
+/** Bearing da direção inicial da polyline (do início em direção ao fim). */
+function getPolylineInitialBearing(positions: [number, number][]): number | null {
+  if (positions.length < 2) return null;
+  const idx = Math.min(Math.floor(positions.length * 0.2), positions.length - 1);
+  const [a0, a1] = positions[0];
+  const [b0, b1] = positions[idx];
+  return getBearing(a0, a1, b0, b1);
+}
+
 /** Bearing do segmento da polyline mais próximo do ponto. */
 function getClosestSegmentBearing(
   positions: [number, number][],
@@ -195,18 +201,18 @@ export function estimateBusSentido(
 
 /**
  * Ícone do ônibus: círculo com número + triângulo (estilo BusTracker Rio).
- * mode: onibus = primary (teal), brt = secondary (laranja).
+ * fillColor: teal para primeira linha, roxo para segunda (quando mode=onibus).
  */
 const getBusIcon = (
   linha: string,
   mode: TransportMode,
   isSelected: boolean,
-  speed?: number,
-  _heading?: number
+  speed: number | undefined,
+  _heading: number | undefined,
+  fillColor: string
 ) => {
   if (typeof window === "undefined") return null;
   const L = require("leaflet");
-  const fillColor = mode === "onibus" ? PRIMARY_COLOR : SECONDARY_COLOR;
   const size = isSelected ? 40 : 32;
   const gap = 2;
   const triangleH = 6;
@@ -397,21 +403,44 @@ export function formatLastUpdate(timestamp: string): string {
 
 export type DirectionFilter = "all" | "ida" | "volta";
 
+/** Sentidos selecionados: ida e/ou volta. Ambos true = mostrar os dois. */
+export type SelectedDirections = { ida: boolean; volta: boolean };
+
 export const BusMarkers = ({
   buses,
   routeShapes = {},
   mode = "onibus",
   selectedBus,
   onSelectBus,
-  directionFilter = "all",
+  selectedDirections = { ida: true, volta: true },
+  selectedLinhas = [],
 }: {
   buses: BusData[];
   routeShapes?: RouteShapesMap;
   mode?: TransportMode;
   selectedBus: string | null;
   onSelectBus: (id: string | null) => void;
-  directionFilter?: DirectionFilter;
+  selectedDirections?: SelectedDirections;
+  selectedLinhas?: string[];
 }) => {
+  // Linhas cuja ordem poly0/poly1 é invertida em relação à primeira linha (normaliza sentido geográfico)
+  const polyOrderSwapped = React.useMemo(() => {
+    const firstLine = selectedLinhas[0] ?? Object.keys(routeShapes)[0];
+    if (!firstLine) return {} as Record<string, boolean>;
+    const firstPolys = routeShapes[firstLine];
+    const b0 = firstPolys && firstPolys[0] ? getPolylineInitialBearing(firstPolys[0]) : null;
+    if (b0 == null) return {} as Record<string, boolean>;
+    const result: Record<string, boolean> = {};
+    for (const linha of Object.keys(routeShapes)) {
+      if (linha === firstLine) continue;
+      const polys = routeShapes[linha];
+      const bx = polys && polys[0] ? getPolylineInitialBearing(polys[0]) : null;
+      if (bx == null) continue;
+      // Se poly0 desta linha aponta ~180° oposto à poly0 da primeira, inverte ida/volta
+      result[linha] = angleDiff(b0, bx) > 150;
+    }
+    return result;
+  }, [routeShapes, selectedLinhas]);
   const [busHistory, setBusHistory] = useState<BusHistoryMap>({});
   const [initialViewSet, setInitialViewSet] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
@@ -536,26 +565,38 @@ export const BusMarkers = ({
     return getBearing(lat1, lon1, lat2, lon2);
   };
 
-  const busesToShow =
-    directionFilter === "all"
-      ? buses
-      : buses.filter(
-          (bus) =>
-            estimateBusSentido(
-              bus,
-              routeShapes[bus.linha],
-              bus.heading ?? getHeadingForBus(bus.id)
-            ) === directionFilter
-        );
+  const busesToShow = buses.filter((bus) => {
+    const polylines = routeShapes[bus.linha];
+    let sentido = estimateBusSentido(
+      bus,
+      polylines,
+      bus.heading ?? getHeadingForBus(bus.id)
+    );
+    // Sem route shapes ou sentido indefinido: mostrar se pelo menos um sentido estiver selecionado
+    if (sentido === null) {
+      return selectedDirections.ida || selectedDirections.volta;
+    }
+    // Normaliza por linha: se poly0 desta linha aponta direção oposta à primeira, inverte ida/volta
+    if (polyOrderSwapped[bus.linha]) {
+      sentido = sentido === "ida" ? "volta" : "ida";
+    }
+    return sentido === "ida" ? selectedDirections.ida : selectedDirections.volta;
+  });
 
   return (
     <>
-      {/* Traçado oficial da linha (GTFS): ida = traço contínuo, volta = tracejado + setas de direção */}
+      {/* Traçado oficial da linha (GTFS): ambas iguais e finas */}
       {Object.entries(routeShapes).flatMap(([linha, polylines]) => {
-        const lineColor = getLineColor(mode);
+        const lineColor =
+          mode === "onibus"
+            ? getLineColorHex(selectedLinhas, linha)
+            : SECONDARY_COLOR;
+        const swapped = polyOrderSwapped[linha];
         return polylines.slice(0, 2).flatMap((positions, idx) => {
-          const isVolta = idx === 1;
-          const dash = isVolta ? "12, 8" : undefined;
+          // idx 0 = poly0, idx 1 = poly1. Se swapped, poly0=volta geo e poly1=ida geo.
+          const geoIsIda = (idx === 0 && !swapped) || (idx === 1 && swapped);
+          const isSelected = geoIsIda ? selectedDirections.ida : selectedDirections.volta;
+          if (!isSelected) return [];
           const arrowPoints = sampleDirectionArrows(positions);
           const lineKey = `route-${linha}-${idx}`;
           return [
@@ -563,10 +604,9 @@ export const BusMarkers = ({
               key={`route-outline-${linha}-${idx}`}
               positions={positions}
               pathOptions={{
-                color: "rgba(0,0,0,0.35)",
-                weight: 8,
+                color: "rgba(0,0,0,0.25)",
+                weight: 5,
                 opacity: 1,
-                dashArray: dash,
                 ...SMOOTH_PATH,
               }}
             />,
@@ -575,9 +615,8 @@ export const BusMarkers = ({
               positions={positions}
               pathOptions={{
                 color: lineColor,
-                weight: 5,
+                weight: 3,
                 opacity: 0.9,
-                dashArray: dash,
                 ...SMOOTH_PATH,
               }}
             />,
@@ -601,7 +640,10 @@ export const BusMarkers = ({
         const history = busHistory[bus.id] || [];
         const positions = history.map((h) => h.position as [number, number]);
         if (positions.length < 2) return null;
-        const lineColor = getLineColor(mode);
+        const lineColor =
+          mode === "onibus"
+            ? getLineColorHex(selectedLinhas, bus.linha)
+            : SECONDARY_COLOR;
         return (
           <Polyline
             key={`trail-${bus.id}`}
@@ -619,12 +661,16 @@ export const BusMarkers = ({
         const isSelected = selectedBus === bus.id;
         const heading = bus.heading ?? getHeadingForBus(bus.id) ?? 0;
         const speed = Number(bus.velocidade) || 0;
+        const fillColor =
+          mode === "onibus"
+            ? getLineColorHex(selectedLinhas, bus.linha)
+            : SECONDARY_COLOR;
 
         return (
           <Marker
             key={bus.id}
             position={[bus.latitude, bus.longitude]}
-            icon={getBusIcon(bus.linha, mode, isSelected, speed, heading)}
+            icon={getBusIcon(bus.linha, mode, isSelected, speed, heading, fillColor)}
             eventHandlers={{
               click: () => onSelectBus(isSelected ? null : bus.id),
             }}

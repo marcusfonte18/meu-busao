@@ -38,12 +38,53 @@ export const InitialSearch = ({
   const [suggestions, setSuggestions] = useState<LineSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [userLocationLabel, setUserLocationLabel] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setUserLocationLabel("Rio de Janeiro");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
+            {
+              headers: { "Accept-Language": "pt-BR", "User-Agent": "MeuBusao/1.0 (bus tracker)" },
+            }
+          );
+          const data = await res.json();
+          const addr = data?.address;
+          if (!addr) {
+            setUserLocationLabel("Rio de Janeiro");
+            return;
+          }
+          const suburb = addr.suburb || addr.neighbourhood || addr.quarter;
+          const city = addr.city || addr.town || addr.municipality || addr.state;
+          const state = addr.state;
+          if (suburb && city) {
+            setUserLocationLabel(`${suburb}, ${city}`);
+          } else if (city) {
+            setUserLocationLabel(state ? `${city}, ${state}` : city);
+          } else {
+            setUserLocationLabel("Rio de Janeiro");
+          }
+        } catch {
+          setUserLocationLabel("Rio de Janeiro");
+        }
+      },
+      () => setUserLocationLabel("Rio de Janeiro"),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    );
+  }, []);
 
   useEffect(() => {
     setLinhaInput("");
@@ -145,9 +186,11 @@ export const InitialSearch = ({
       <div className="mx-auto w-full max-w-md">
         {/* Header */}
         <header className="flex items-center justify-end px-5 pt-4 pb-3">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5" />
-            <span>Rio de Janeiro</span>
+          <div className="flex max-w-[70%] items-center gap-1.5 text-xs text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate" title={userLocationLabel ?? undefined}>
+              {userLocationLabel ?? "..."}
+            </span>
           </div>
         </header>
 

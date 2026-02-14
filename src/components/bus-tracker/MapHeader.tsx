@@ -3,12 +3,14 @@
 import { Bus, MapPin, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { getLineColorHex } from "./bus-marker";
 
 interface MapHeaderProps {
   lineNumbers: string[];
   mode: "onibus" | "brt";
   onClear: () => void;
   onChangeLine: () => void;
+  onRemoveLine?: (linha: string) => void;
 }
 
 export function MapHeader({
@@ -16,7 +18,10 @@ export function MapHeader({
   mode,
   onClear,
   onChangeLine,
+  onRemoveLine,
 }: MapHeaderProps) {
+  const canRemoveIndividual = lineNumbers.length > 1 && onRemoveLine;
+
   return (
     <header className="relative z-10 border-b border-border bg-card shadow-sm">
       <div className="flex items-center h-14 justify-between gap-3 px-4 py-3">
@@ -29,13 +34,11 @@ export function MapHeader({
             <Bus className="h-5 w-5" />
           </Link>
           <div className="flex flex-col overflow-hidden">
-            <span className="truncate font-display text-base font-bold text-foreground">
-              Meu Busão
-            </span>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+           
+            <span className="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
               <span
                 className={cn(
-                  "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase",
+                  "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase shrink-0",
                   mode === "onibus"
                     ? "bg-primary/10 text-primary"
                     : "bg-secondary/10 text-secondary"
@@ -43,7 +46,36 @@ export function MapHeader({
               >
                 {mode === "brt" ? "BRT" : "Bus"}
               </span>
-              <span className="truncate">{lineNumbers.join(", ")}</span>
+              {lineNumbers.map((linha) => (
+                <span
+                  key={linha}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold text-white",
+                    canRemoveIndividual && "pr-1"
+                  )}
+                  style={
+                    mode === "onibus"
+                      ? { backgroundColor: getLineColorHex(lineNumbers, linha) }
+                      : { backgroundColor: "hsl(var(--secondary))" }
+                  }
+                >
+                  {linha}
+                  {canRemoveIndividual && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onRemoveLine?.(linha);
+                      }}
+                      className="rounded p-0.5 hover:bg-white/20 transition-colors"
+                      aria-label={`Remover linha ${linha}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
             </span>
           </div>
         </div>
@@ -55,13 +87,7 @@ export function MapHeader({
             <MapPin className="h-3.5 w-3.5 text-primary" />
             <span>Trocar</span>
           </button>
-          <button
-            onClick={onClear}
-            className="flex items-center gap-1.5 rounded-xl bg-destructive px-3 py-2 text-xs font-bold text-destructive-foreground shadow-sm shadow-destructive/20 transition-all duration-200 hover:bg-destructive/90 active:scale-95"
-          >
-            <X className="h-3.5 w-3.5" />
-            <span>Limpar</span>
-          </button>
+       
         </div>
       </div>
     </header>

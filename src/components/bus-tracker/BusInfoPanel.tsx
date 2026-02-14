@@ -2,6 +2,7 @@
 
 import { Clock, Navigation, Bus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getLineColorsByIndex } from "./bus-marker";
 
 interface BusInfoPanelProps {
   lineNumber: string;
@@ -11,6 +12,7 @@ interface BusInfoPanelProps {
   heading: number;
   lastUpdate: string;
   onClose: () => void;
+  selectedLinhas?: string[];
 }
 
 export function BusInfoPanel({
@@ -21,7 +23,15 @@ export function BusInfoPanel({
   heading,
   lastUpdate,
   onClose,
+  selectedLinhas = [],
 }: BusInfoPanelProps) {
+  const colors =
+    mode === "onibus" && selectedLinhas.length > 0
+      ? getLineColorsByIndex(selectedLinhas, lineNumber)
+      : mode === "onibus"
+        ? { bg: "bg-primary", text: "text-primary-foreground", iconColor: "hsl(174,72%,40%)" }
+        : { bg: "bg-secondary", text: "text-secondary-foreground", iconColor: "hsl(38,92%,50%)" };
+
   const directionLabel = (deg: number) => {
     if (deg >= 337.5 || deg < 22.5) return "Norte";
     if (deg >= 22.5 && deg < 67.5) return "Nordeste";
@@ -34,15 +44,14 @@ export function BusInfoPanel({
   };
 
   return (
-    <div className="absolute bottom-4 left-4 right-4 z-20 animate-in slide-in-from-bottom-4 duration-300">
+    <div className="absolute bottom-0 left-4 right-4 z-20 animate-in slide-in-from-bottom-4 duration-300">
       <div className="rounded-2xl border border-border bg-card p-4 shadow-xl">
         <div className="flex items-start gap-3">
           <div
             className={cn(
               "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-bold",
-              mode === "onibus"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground"
+              colors.bg,
+              colors.text
             )}
           >
             {lineNumber}
@@ -62,18 +71,18 @@ export function BusInfoPanel({
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <Bus className="h-3 w-3 text-primary" />
+                <Bus className="h-3 w-3" style={{ color: colors.iconColor }} />
                 {speed} km/h
               </span>
               <span className="flex items-center gap-1">
                 <Navigation
-                  className="h-3 w-3 text-secondary"
-                  style={{ transform: `rotate(${heading}deg)` }}
+                  className="h-3 w-3"
+                  style={{ transform: `rotate(${heading}deg)`, color: colors.iconColor }}
                 />
                 {directionLabel(heading)}
               </span>
               <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3 text-accent" />
+                <Clock className="h-3 w-3 text-muted-foreground" />
                 {lastUpdate}
               </span>
             </div>

@@ -1,11 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { Search, MapPin, Clock } from "lucide-react";
+import { Search, MapPin, Clock, Navigation, Bus } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export type BusInfoForNav = {
+  lineNumber: string;
+  destination: string;
+  speed: number;
+  heading: number;
+  headingLabel: string;
+  lastUpdate: string;
+};
 
 interface BottomNavProps {
   active: string;
+  busInfo?: BusInfoForNav | null;
   onBuscarClick?: () => void;
 }
 
@@ -15,10 +25,12 @@ const navItems = [
   { id: "recentes", label: "Recentes", icon: Clock, href: "/" },
 ];
 
-export function BottomNav({ active, onBuscarClick }: BottomNavProps) {
+export function BottomNav({ active, busInfo, onBuscarClick }: BottomNavProps) {
+  const showBusInfo = active === "mapa" && busInfo;
   return (
-    <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-50 flex h-14 items-stretch border-t border-border bg-card/95 backdrop-blur-lg">
-      <div className="mx-auto flex h-full max-w-md flex-1 items-center justify-around px-2">
+    <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-50 flex flex-col border-t border-border bg-card/95 backdrop-blur-lg">
+    
+      <div className={cn("mx-auto flex max-w-md flex-1 items-center justify-around px-2", showBusInfo ? "h-14 shrink-0" : "h-14 flex-1")}>
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.id === active;

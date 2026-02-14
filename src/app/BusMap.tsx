@@ -9,7 +9,7 @@ import {
   BusMarkers,
   formatLastUpdate,
   type RouteShapesMap,
-  type DirectionFilter,
+  type SelectedDirections,
 } from "./MapView";
 import { BusInfoPanel } from "@/components/bus-tracker/BusInfoPanel";
 import { MapHeader } from "@/components/bus-tracker/MapHeader";
@@ -70,19 +70,33 @@ export const BusMap = ({
   mode = "onibus",
   selectedLinha,
   onClearSelectedLinha,
+  onRemoveLine,
   onTrocarLinhas,
+  onBusInfoChange,
   initialCenter = [-22.9068, -43.1729],
 }: {
   mode?: TransportMode;
   selectedLinha: Array<string>;
   onClearSelectedLinha: () => void;
+  onRemoveLine?: (linha: string) => void;
   onTrocarLinhas?: () => void;
+  onBusInfoChange?: (info: {
+    lineNumber: string;
+    destination: string;
+    speed: number;
+    heading: number;
+    headingLabel: string;
+    lastUpdate: string;
+  } | null) => void;
   initialCenter?: [number, number] | { lat: number; lng: number };
 }) => {
   const { data: buses, isLoading } = useBusData(selectedLinha, mode);
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
-  const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
+  const [selectedDirections, setSelectedDirections] = useState<SelectedDirections>({
+    ida: true,
+    volta: true,
+  });
   const [lineDirectionLabels, setLineDirectionLabels] = useState<
     Record<string, { ida: string; volta: string }>
   >({});
@@ -124,6 +138,36 @@ export const BusMap = ({
     ).then(() => setLineDirectionLabels(acc));
   }, [selectedLinha.join(","), mode]);
 
+  useEffect(() => {
+    if (!selectedBusId || !buses) {
+      onBusInfoChange?.(null);
+      return;
+    }
+    const bus = buses.find((b) => b.id === selectedBusId);
+    if (!bus) {
+      onBusInfoChange?.(null);
+      return;
+    }
+    const heading = bus.heading ?? 0;
+    const headingLabel =
+      heading >= 337.5 || heading < 22.5 ? "Norte" :
+      heading >= 22.5 && heading < 67.5 ? "Nordeste" :
+      heading >= 67.5 && heading < 112.5 ? "Leste" :
+      heading >= 112.5 && heading < 157.5 ? "Sudeste" :
+      heading >= 157.5 && heading < 202.5 ? "Sul" :
+      heading >= 202.5 && heading < 247.5 ? "Sudoeste" :
+      heading >= 247.5 && heading < 292.5 ? "Oeste" : "Noroeste";
+
+    onBusInfoChange?.({
+      lineNumber: bus.linha,
+      destination: `Linha ${bus.linha}`,
+      speed: Math.round(Number(bus.velocidade) || 0),
+      heading,
+      headingLabel,
+      lastUpdate: formatLastUpdate(bus.timestamp),
+    });
+  }, [selectedBusId, buses, onBusInfoChange]);
+
   if (isLoading || !buses || buses.length === 0) {
     return <LoadingState mode={mode} />;
   }
@@ -137,52 +181,39 @@ export const BusMap = ({
           mode={mode}
           onClear={onClearSelectedLinha}
           onChangeLine={onTrocarLinhas ?? (() => {})}
+          onRemoveLine={onRemoveLine}
         />
-        {/* Filtro de sentido: ver todos ou só ida/volta */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
-          <span className="text-xs font-medium text-muted-foreground">Sentido:</span>
-          {(() => {
-            const firstLine = selectedLinha[0];
-            const labels = firstLine ? lineDirectionLabels[firstLine] : null;
-            const idaLabel = labels?.ida ?? "Ida";
-            const voltaLabel = labels?.volta ?? "Volta";
-            return (
-              <>
-                <button
-                  onClick={() => setDirectionFilter("all")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    directionFilter === "all"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  }`}
-                >
-                  Todos
-                </button>
-                <button
-                  onClick={() => setDirectionFilter("ida")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    directionFilter === "ida"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  }`}
-                  title={idaLabel}
-                >
-                  {idaLabel}
-                </button>
-                <button
-                  onClick={() => setDirectionFilter("volta")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    directionFilter === "volta"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  }`}
-                  title={voltaLabel}
-                >
-                  {voltaLabel}
-                </button>
-              </>
-            );
-          })()}
+        {/* Filtro de sentido: ambos selecionados por padrão; clique para alternar */}
+        <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/30 px-4 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground shrink-0">Sentido:</span>
+            <button
+              onClick={() =>
+                setSelectedDirections((prev) => ({ ...prev, ida: !prev.ida }))
+              }
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                selectedDirections.ida
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+              }`}
+            >
+              Ida
+            </button>
+            <button
+              onClick={() =>
+                setSelectedDirections((prev) => ({ ...prev, volta: !prev.volta }))
+              }
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                selectedDirections.volta
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+              }`}
+            >
+              Volta
+            </button>
+            <span className="text-[10px] text-muted-foreground">(aplica a todas as linhas)</span>
+          </div>
+        
         </div>
         <CardContent className="relative min-h-0 flex-1 p-0">
           <div className="h-full w-full overflow-hidden rounded-b-none md:rounded-b-lg">
@@ -203,7 +234,8 @@ export const BusMap = ({
                 mode={mode}
                 selectedBus={selectedBusId}
                 onSelectBus={setSelectedBusId}
-                directionFilter={directionFilter}
+                selectedDirections={selectedDirections}
+                selectedLinhas={selectedLinha}
               />
             </MapContainer>
           </div>
@@ -213,7 +245,7 @@ export const BusMap = ({
             const heading = bus.heading ?? 0;
             const speed = Math.round(Number(bus.velocidade) || 0);
             return (
-              <div className="absolute bottom-20 left-0 right-0 z-20 flex justify-center px-4">
+              <div className="absolute bottom-16 left-0 right-0 z-20 flex justify-center px-4">
                 <BusInfoPanel
                   lineNumber={bus.linha}
                   destination={`Linha ${bus.linha}`}
@@ -222,6 +254,7 @@ export const BusMap = ({
                   heading={heading}
                   lastUpdate={formatLastUpdate(bus.timestamp)}
                   onClose={() => setSelectedBusId(null)}
+                  selectedLinhas={selectedLinha}
                 />
               </div>
             );

@@ -44,6 +44,14 @@ export default function HomePage() {
   const [transportMode, setTransportMode] = useState<TransportMode>("onibus");
   const [hasHydrated, setHasHydrated] = useState(false);
   const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [busInfo, setBusInfo] = useState<{
+    lineNumber: string;
+    destination: string;
+    speed: number;
+    heading: number;
+    headingLabel: string;
+    lastUpdate: string;
+  } | null>(null);
 
   useEffect(() => {
     setSelectedLine(loadSavedLinhas());
@@ -97,14 +105,22 @@ export default function HomePage() {
       <BusMap
         mode={transportMode}
         onClearSelectedLinha={handleClear}
+        onRemoveLine={(linha) => {
+          const next = selectedLine.filter((l) => l !== linha);
+          setSelectedLine(next);
+          saveLinhas(next);
+        }}
         onTrocarLinhas={() => setSelectedLine([])}
+        onBusInfoChange={setBusInfo}
         selectedLinha={selectedLine}
         initialCenter={initialCenter ?? DEFAULT_CENTER}
       />
       <BottomNav
         active="mapa"
+        busInfo={busInfo}
         onBuscarClick={() => {
           setSelectedLine([]);
+          setBusInfo(null);
           saveLinhas([]);
         }}
       />
