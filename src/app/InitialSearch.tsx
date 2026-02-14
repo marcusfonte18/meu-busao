@@ -1,15 +1,28 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Plus, X } from "lucide-react";
-import { BusFrontIcon } from "@/components/BusFrontIcon";
-import { SearchHeroBg } from "@/components/SearchHeroBg";
+import {
+  Plus,
+  X,
+  Search,
+  Sparkles,
+  Bus,
+  Train,
+  TrendingUp,
+  Clock,
+  MapPin,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { TransportMode } from "./types";
 
 type LineSuggestion = { numero: string; nome: string };
+
+const POPULAR_LINES: LineSuggestion[] = [
+  { numero: "474", nome: "Jacaré - Copacabana" },
+  { numero: "485", nome: "Penha - Cosme Velho" },
+  { numero: "T47", nome: "Alvorada - Jardim Oceânico" },
+  { numero: "384", nome: "Pavuna - Carioca" },
+];
 
 export const InitialSearch = ({
   mode: initialMode,
@@ -21,6 +34,7 @@ export const InitialSearch = ({
   const [mode, setMode] = useState<TransportMode>(initialMode);
   const [linhaInput, setLinhaInput] = useState("");
   const [linhas, setLinhas] = useState<string[]>([]);
+  const [linhasNomes, setLinhasNomes] = useState<Record<string, string>>({});
   const [suggestions, setSuggestions] = useState<LineSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -39,7 +53,7 @@ export const InitialSearch = ({
 
   useEffect(() => {
     const q = linhaInput.trim();
-    const minChars = mode === "brt" ? 1 : 2; // BRT: 35, 52 etc.; ônibus: 38, Pavuna
+    const minChars = mode === "brt" ? 1 : 2;
     if (q.length < minChars) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -82,22 +96,32 @@ export const InitialSearch = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleAddLinha = (numero?: string) => {
-    const value = (numero ?? linhaInput).trim();
-    if (value && !linhas.includes(value)) {
-      setLinhas([...linhas, value]);
-      setLinhaInput("");
-      setSuggestions([]);
-      setShowSuggestions(false);
-    }
+  const handleAddLinha = (numero?: string, nome?: string) => {
+    const num = (numero ?? linhaInput).trim();
+    if (!num) return;
+    if (linhas.includes(num)) return;
+    setLinhas([...linhas, num]);
+    if (nome) setLinhasNomes((prev) => ({ ...prev, [num]: nome }));
+    setLinhaInput("");
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  const handleAddPopular = (line: LineSuggestion) => {
+    handleAddLinha(line.numero, line.nome);
   };
 
   const handleSuggestionClick = (s: LineSuggestion) => {
-    handleAddLinha(s.numero);
+    handleAddLinha(s.numero, s.nome);
   };
 
   const handleRemoveLinha = (linha: string) => {
     setLinhas(linhas.filter((l) => l !== linha));
+    setLinhasNomes((prev) => {
+      const next = { ...prev };
+      delete next[linha];
+      return next;
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -107,74 +131,91 @@ export const InitialSearch = ({
     }
   };
 
-  return (
-    <div className="relative w-full min-h-[100dvh] flex flex-col items-center search-hero-bg p-4 sm:p-6">
-      <SearchHeroBg />
+  const getLineDisplay = (num: string) => {
+    const pop = POPULAR_LINES.find((p) => p.numero === num);
+    const nome = linhasNomes[num] ?? pop?.nome;
+    return nome ? `${num} – ${nome}` : `Linha ${num}`;
+  };
 
-      <Card className="relative z-10 w-full max-w-md mt-12 sm:mt-16 bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl">
-        <CardHeader className="pb-4 space-y-4">
-          <CardTitle className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            {mode === "brt"
-              ? "Buscar Linha BRT"
-              : "Buscar Linha de Ônibus"}
-          </CardTitle>
-          <p className="text-sm text-blue-200/80">
-            {mode === "brt"
-              ? "Selecione as linhas do BRT para acompanhar em tempo real."
-              : "Encontre sua linha por número ou destino."}
-          </p>
-          <div className="flex gap-2 pt-1">
-            <Button
-              type="button"
-              size="sm"
-              className={`flex-1 transition-all ${
-                mode === "onibus"
-                  ? "bg-blue-500/90 hover:bg-blue-500 text-white border border-blue-400"
-                  : "bg-white/5 text-white/80 hover:bg-white/10 border border-white/20"
-              }`}
-              onClick={() => setMode("onibus")}
-            >
-              Ônibus
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className={`flex-1 transition-all ${
-                mode === "brt"
-                  ? "bg-blue-500/90 hover:bg-blue-500 text-white border border-blue-400"
-                  : "bg-white/5 text-white/80 hover:bg-white/10 border border-white/20"
-              }`}
-              onClick={() => setMode("brt")}
-            >
-              BRT
-            </Button>
+  const getLineType = (num: string): TransportMode =>
+    num.startsWith("T") ? "brt" : "onibus";
+
+  return (
+    <div className="flex min-h-svh flex-col bg-background">
+      <div className="mx-auto w-full max-w-md">
+        {/* Header */}
+        <header className="flex items-center justify-end px-5 pt-4 pb-3">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" />
+            <span>Rio de Janeiro</span>
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row gap-2 relative" ref={wrapperRef}>
-              <div className="flex-1 min-w-0 relative">
-                <Input
-                  type="text"
-                  placeholder={
-                    mode === "brt"
-                      ? "Número da linha BRT (ex: 35, 52)"
-                      : "Número ou destino (ex: 384 ou Pavuna)"
-                  }
-                  value={linhaInput}
-                  onChange={(e) => setLinhaInput(e.target.value)}
-                  onFocus={() => linhaInput.trim() && setShowSuggestions(true)}
-                  className="w-full min-w-0 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-blue-400 focus:ring-blue-400/30"
-                  autoComplete="off"
-                />
-                {showSuggestions &&
-                  linhaInput.trim().length >= (mode === "brt" ? 1 : 2) && (
+        </header>
+
+        <main className="flex flex-col gap-5 px-5 pb-8 pt-2">
+          {/* Title Section */}
+          <div className="flex flex-col gap-1">
+            <h1 className="flex items-center gap-2 font-display text-2xl font-bold text-foreground">
+              <Sparkles className="h-6 w-6 text-secondary" />
+              <span>Buscar Linha</span>
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Encontre e monitore ônibus e BRT em tempo real
+            </p>
+          </div>
+
+          {/* Transport Type Toggle */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setMode("onibus")}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all duration-200",
+                mode === "onibus"
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                  : "border border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+              )}
+            >
+              <Bus className="h-4 w-4" />
+              Ônibus
+            </button>
+            <button
+              onClick={() => setMode("brt")}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all duration-200",
+                mode === "brt"
+                  ? "bg-secondary text-secondary-foreground shadow-lg shadow-secondary/25"
+                  : "border border-border bg-card text-muted-foreground hover:border-secondary/30 hover:text-foreground"
+              )}
+            >
+              <Train className="h-4 w-4" />
+              BRT
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="flex flex-col gap-3" ref={wrapperRef}>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={linhaInput}
+                onChange={(e) => setLinhaInput(e.target.value)}
+                onFocus={() => linhaInput.trim() && setShowSuggestions(true)}
+                placeholder={
+                  mode === "brt"
+                    ? "Estação ou linha BRT (ex: T47)"
+                    : "Número ou destino (ex: 384 ou Pavuna)"
+                }
+                autoComplete="off"
+                className="w-full rounded-xl border border-border bg-card py-3.5 pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              {showSuggestions &&
+                linhaInput.trim().length >= (mode === "brt" ? 1 : 2) && (
                   <ul
-                    className="absolute z-50 w-full mt-1 py-1 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-lg shadow-xl max-h-56 overflow-auto"
+                    className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-card py-1 shadow-lg max-h-56 overflow-auto"
                     role="listbox"
                   >
                     {loadingSuggestions ? (
-                      <li className="px-3 py-3 text-sm text-blue-200/80">
+                      <li className="px-4 py-3 text-sm text-muted-foreground">
                         Buscando...
                       </li>
                     ) : suggestions.length > 0 ? (
@@ -182,67 +223,148 @@ export const InitialSearch = ({
                         <li
                           key={s.numero}
                           role="option"
-                          className="px-3 py-2.5 cursor-pointer hover:bg-blue-500/20 text-sm flex flex-col sm:flex-row sm:items-center sm:gap-2 text-white border-b border-white/5 last:border-0 transition-colors"
+                          className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             handleSuggestionClick(s);
                           }}
                         >
-                          <span className="font-semibold text-blue-200">{s.numero}</span>
+                          <span className="font-semibold">{s.numero}</span>
                           {s.nome && (
-                            <span className="text-white/70 truncate">{s.nome}</span>
+                            <span className="truncate text-muted-foreground">
+                              {s.nome}
+                            </span>
                           )}
                         </li>
                       ))
                     ) : (
-                      <li className="px-3 py-3 text-sm text-white/60">
+                      <li className="px-4 py-3 text-sm text-muted-foreground">
                         Nenhuma linha encontrada
                       </li>
                     )}
                   </ul>
                 )}
-              </div>
-              <Button
-                type="button"
-                onClick={() => handleAddLinha()}
-                className="flex-shrink-0 sm:w-auto w-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar
-              </Button>
             </div>
 
-            {linhas.length > 0 && (
-              <div className="flex flex-wrap gap-2 min-h-[40px] p-3 bg-white/5 rounded-lg border border-white/10">
-                {linhas.map((linha) => (
-                  <span
-                    key={linha}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleRemoveLinha(linha)}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" && handleRemoveLinha(linha)
-                    }
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-blue-500/30 text-white text-sm font-medium cursor-pointer hover:bg-blue-500/50 border border-blue-400/30 transition-colors"
+            {/* Add Button */}
+            <button
+              type="button"
+              onClick={() => handleAddLinha()}
+              className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card/50 py-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar
+            </button>
+          </div>
+
+          {/* Selected Lines */}
+          {linhas.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-foreground">
+                  Linhas selecionadas ({linhas.length})
+                </span>
+                {linhas.length > 1 && (
+                  <button
+                    onClick={() => {
+                      setLinhas([]);
+                      setLinhasNomes({});
+                    }}
+                    className="text-xs font-medium text-destructive hover:underline"
                   >
-                    {linha}
-                    <X className="h-3 w-3" />
-                  </span>
+                    Limpar todas
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                {linhas.map((linha) => {
+                  const lineType = getLineType(linha);
+                  return (
+                    <div
+                      key={linha}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl border p-3 transition-all duration-200 hover:shadow-md",
+                        lineType === "onibus"
+                          ? "border-primary/20 bg-primary/5"
+                          : "border-secondary/20 bg-secondary/5"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
+                          lineType === "onibus"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground"
+                        )}
+                      >
+                        {linha}
+                      </div>
+                      <div className="flex flex-1 flex-col gap-0.5">
+                        <span className="text-sm font-semibold text-foreground">
+                          {getLineDisplay(linha)}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          Estimativa em breve
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveLinha(linha)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        aria-label={`Remover linha ${linha}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Start Monitoring Button */}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={linhas.length === 0}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-xl py-4 text-sm font-bold transition-all duration-300 active:scale-[0.98]",
+              linhas.length === 0
+                ? "cursor-not-allowed bg-muted text-muted-foreground"
+                : "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
+            )}
+          >
+            ▶ Iniciar Monitoramento
+          </button>
+
+          {/* Popular Lines */}
+          {linhas.length === 0 && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <TrendingUp className="h-4 w-4 text-secondary" />
+                <span>Linhas populares</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {POPULAR_LINES.map((line) => (
+                  <button
+                    key={line.numero}
+                    onClick={() => handleAddPopular(line)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:shadow-md active:scale-95",
+                      line.numero.startsWith("T")
+                        ? "border-secondary/20 bg-secondary/5 text-secondary hover:bg-secondary/10"
+                        : "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10"
+                    )}
+                  >
+                    <span className="font-bold">{line.numero}</span>
+                    <span className="text-muted-foreground">{line.nome}</span>
+                  </button>
                 ))}
               </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={linhas.length === 0}
-              className="w-full mt-2 py-6 text-base font-semibold bg-transparent hover:bg-blue-500/20 text-blue-300 border-2 border-blue-400/60 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-            >
-              <BusFrontIcon className="h-5 w-5 mr-2" />
-              Iniciar Monitoramento
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 };
