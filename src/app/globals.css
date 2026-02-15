@@ -99,13 +99,35 @@ body {
   pointer-events: none !important;
 }
 
-/* Sonner toast: usar paleta primária (teal) para sucesso */
+/* Sonner toast: usar cor primária da paleta (Teal - 1ª linha) */
 [data-rich-colors='true'][data-sonner-toast][data-type='success'] {
   background: hsl(174, 72%, 96%) !important;
   border-color: hsl(174, 72%, 88%) !important;
-  color: hsl(174, 72%, 35%) !important;
+  color: hsl(174, 72%, 40%) !important;
 }
 [data-rich-colors='true'][data-sonner-toast][data-type='success'] [data-close-button],
 [data-rich-colors='true'][data-sonner-toast][data-type='success'] [data-icon] {
-  color: hsl(174, 72%, 35%) !important;
+  color: hsl(174, 72%, 40%) !important;
+}
+
+/* Toast info: Purple (2ª cor da paleta) */
+[data-rich-colors='true'][data-sonner-toast][data-type='info'] {
+  background: hsl(262, 60%, 97%) !important;
+  border-color: hsl(262, 60%, 90%) !important;
+  color: hsl(262, 60%, 45%) !important;
+}
+[data-rich-colors='true'][data-sonner-toast][data-type='info'] [data-close-button],
+[data-rich-colors='true'][data-sonner-toast][data-type='info'] [data-icon] {
+  color: hsl(262, 60%, 45%) !important;
+}
+
+/* Toast error: Rose (4ª cor da paleta - vermelho) */
+[data-rich-colors='true'][data-sonner-toast][data-type='error'] {
+  background: hsl(340, 75%, 97%) !important;
+  border-color: hsl(340, 75%, 90%) !important;
+  color: hsl(340, 65%, 45%) !important;
+}
+[data-rich-colors='true'][data-sonner-toast][data-type='error'] [data-close-button],
+[data-rich-colors='true'][data-sonner-toast][data-type='error'] [data-icon] {
+  color: hsl(340, 65%, 45%) !important;
 }

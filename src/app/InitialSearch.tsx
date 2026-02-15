@@ -174,12 +174,16 @@ export const InitialSearch = ({
   };
 
   const handleRemoveLinha = (linha: string) => {
-    setLinhas(linhas.filter((l) => l !== linha));
+    const next = linhas.filter((l) => l !== linha);
+    setLinhas(next);
     setLinhasNomes((prev) => {
-      const next = { ...prev };
-      delete next[linha];
-      return next;
+      const updated = { ...prev };
+      delete updated[linha];
+      return updated;
     });
+    toast.error(
+      next.length === 0 ? "Todas as linhas foram removidas" : `Linha ${linha} removida`
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -195,7 +199,6 @@ export const InitialSearch = ({
     return nome ? `${num} – ${nome}` : `Linha ${num}`;
   };
 
-  console.log('userLocationLabel', userLocationLabel);
 
   const getLineType = (num: string): TransportMode =>
     num.startsWith("T") ? "brt" : "onibus";
@@ -331,6 +334,7 @@ export const InitialSearch = ({
                     onClick={() => {
                       setLinhas([]);
                       setLinhasNomes({});
+                      toast.error("Todas as linhas foram removidas");
                     }}
                     className="text-xs font-medium text-destructive hover:underline"
                   >

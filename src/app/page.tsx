@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 
 import { resetRegistry } from "@/lib/line-colors";
 import { InitialSearch } from "./InitialSearch";
@@ -82,31 +82,25 @@ export default function HomePage() {
     setSelectedLine([]);
     resetRegistry();
     saveLinhas([]);
+    toast.error("Todas as linhas foram removidas");
   };
-
-  if (!hasHydrated) {
-    return (
-      <div className="flex min-h-[100dvh] w-full items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Carregando...</div>
-      </div>
-    );
-  }
-
-  if (selectedLine.length === 0) {
-    return (
-      <>
-        <Toaster position="top-center" richColors theme="light" />
-        <div className="flex min-h-[100dvh] flex-col pb-14">
-          <InitialSearch mode="onibus" onSearch={handleSearch} />
-        </div>
-        <BottomNav active="buscar" />
-      </>
-    );
-  }
 
   return (
     <>
       <Toaster position="top-center" richColors theme="light" />
+      {!hasHydrated ? (
+        <div className="flex min-h-[100dvh] w-full items-center justify-center bg-background">
+          <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        </div>
+      ) : selectedLine.length === 0 ? (
+        <>
+          <div className="flex min-h-[100dvh] flex-col pb-14">
+            <InitialSearch mode="onibus" onSearch={handleSearch} />
+          </div>
+          <BottomNav active="buscar" />
+        </>
+      ) : (
+        <>
       <BusMap
         mode={transportMode}
         onClearSelectedLinha={handleClear}
@@ -114,6 +108,10 @@ export default function HomePage() {
           const next = selectedLine.filter((l) => l !== linha);
           setSelectedLine(next);
           saveLinhas(next);
+          if (next.length === 0) resetRegistry();
+          toast.error(
+            next.length === 0 ? "Todas as linhas foram removidas" : `Linha ${linha} removida`
+          );
         }}
         onTrocarLinhas={() => setSelectedLine([])}
         onBusInfoChange={setBusInfo}
@@ -128,8 +126,11 @@ export default function HomePage() {
           setBusInfo(null);
           resetRegistry();
           saveLinhas([]);
+          toast.error("Linhas removidas. Busque novas linhas.");
         }}
       />
+        </>
+      )}
     </>
   );
 }
