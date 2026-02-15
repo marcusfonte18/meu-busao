@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { Toaster } from "sonner";
 
+import { resetRegistry } from "@/lib/line-colors";
 import { InitialSearch } from "./InitialSearch";
 import { BusMap } from "./BusMap";
 import { BottomNav } from "@/components/bus-tracker/BottomNav";
@@ -78,6 +80,7 @@ export default function HomePage() {
 
   const handleClear = () => {
     setSelectedLine([]);
+    resetRegistry();
     saveLinhas([]);
   };
 
@@ -92,7 +95,8 @@ export default function HomePage() {
   if (selectedLine.length === 0) {
     return (
       <>
-        <div className="flex min-h-[100dvh] flex-col pb-20">
+        <Toaster position="top-center" richColors theme="light" />
+        <div className="flex min-h-[100dvh] flex-col pb-14">
           <InitialSearch mode="onibus" onSearch={handleSearch} />
         </div>
         <BottomNav active="buscar" />
@@ -102,6 +106,7 @@ export default function HomePage() {
 
   return (
     <>
+      <Toaster position="top-center" richColors theme="light" />
       <BusMap
         mode={transportMode}
         onClearSelectedLinha={handleClear}
@@ -121,6 +126,7 @@ export default function HomePage() {
         onBuscarClick={() => {
           setSelectedLine([]);
           setBusInfo(null);
+          resetRegistry();
           saveLinhas([]);
         }}
       />

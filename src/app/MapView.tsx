@@ -9,7 +9,7 @@ import { useMap, useMapEvents } from "react-leaflet";
 import { toast } from "sonner";
 import { Locate } from "lucide-react";
 import type { TransportMode } from "./types";
-import { getLineColorHex } from "@/components/bus-tracker/bus-marker";
+import { getLineHex } from "@/lib/line-colors";
 
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
@@ -25,7 +25,7 @@ const Polyline = dynamic(
   { ssr: false }
 );
 
-/** Cores do tema: secondary (BRT). Ônibus usa getLineColorHex (teal/roxo por linha). */
+/** Cores do tema: secondary (BRT). Ônibus usa getLineHex (paleta de 8 cores). */
 const SECONDARY_COLOR = "#eab308";
 
 /** Opções comuns para suavidade do traço (lineCap/lineJoin arredondados) */
@@ -441,6 +441,7 @@ export const BusMarkers = ({
     }
     return result;
   }, [routeShapes, selectedLinhas]);
+
   const [busHistory, setBusHistory] = useState<BusHistoryMap>({});
   const [initialViewSet, setInitialViewSet] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
@@ -589,7 +590,7 @@ export const BusMarkers = ({
       {Object.entries(routeShapes).flatMap(([linha, polylines]) => {
         const lineColor =
           mode === "onibus"
-            ? getLineColorHex(selectedLinhas, linha)
+            ? getLineHex(linha)
             : SECONDARY_COLOR;
         const swapped = polyOrderSwapped[linha];
         return polylines.slice(0, 2).flatMap((positions, idx) => {
@@ -642,7 +643,7 @@ export const BusMarkers = ({
         if (positions.length < 2) return null;
         const lineColor =
           mode === "onibus"
-            ? getLineColorHex(selectedLinhas, bus.linha)
+            ? getLineHex(bus.linha)
             : SECONDARY_COLOR;
         return (
           <Polyline
@@ -663,7 +664,7 @@ export const BusMarkers = ({
         const speed = Number(bus.velocidade) || 0;
         const fillColor =
           mode === "onibus"
-            ? getLineColorHex(selectedLinhas, bus.linha)
+            ? getLineHex(bus.linha)
             : SECONDARY_COLOR;
 
         return (

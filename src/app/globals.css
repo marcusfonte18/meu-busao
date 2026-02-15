@@ -98,3 +98,14 @@ body {
 .direction-arrow-icon * {
   pointer-events: none !important;
 }
+
+/* Sonner toast: usar paleta primária (teal) para sucesso */
+[data-rich-colors='true'][data-sonner-toast][data-type='success'] {
+  background: hsl(174, 72%, 96%) !important;
+  border-color: hsl(174, 72%, 88%) !important;
+  color: hsl(174, 72%, 35%) !important;
+}
+[data-rich-colors='true'][data-sonner-toast][data-type='success'] [data-close-button],
+[data-rich-colors='true'][data-sonner-toast][data-type='success'] [data-icon] {
+  color: hsl(174, 72%, 35%) !important;
+}

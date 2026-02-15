@@ -13,9 +13,9 @@ import {
 } from "./MapView";
 import { BusInfoPanel } from "@/components/bus-tracker/BusInfoPanel";
 import { MapHeader } from "@/components/bus-tracker/MapHeader";
+import { registerLines } from "@/lib/line-colors";
 import type { TransportMode } from "./types";
 import dynamic from "next/dynamic";
-import { Toaster } from "sonner";
 
 /** Converte nome da linha (ex: "Pavuna - Passeio") em labels dos sentidos. */
 function parseDirectionLabels(nome: string): { ida: string; volta: string } {
@@ -172,9 +172,10 @@ export const BusMap = ({
     return <LoadingState mode={mode} />;
   }
 
+  registerLines(selectedLinha);
+
   return (
     <div className="flex h-[100dvh] w-full flex-col">
-      <Toaster position="top-center" />
       <Card className="m-0 flex min-h-0 flex-1 flex-col rounded-none border-border bg-card shadow-xl md:m-4 md:rounded-lg">
         <MapHeader
           lineNumbers={selectedLinha}

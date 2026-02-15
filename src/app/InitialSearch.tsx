@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   Plus,
   X,
@@ -39,6 +40,7 @@ export const InitialSearch = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [userLocationLabel, setUserLocationLabel] = useState<string | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -49,22 +51,28 @@ export const InitialSearch = ({
   useEffect(() => {
     if (!navigator.geolocation) {
       setUserLocationLabel("Rio de Janeiro");
+      setLocationLoading(false);
       return;
     }
+    setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         try {
+          const base = process.env.NEXT_PUBLIC_API_URL || "";
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
-            {
-              headers: { "Accept-Language": "pt-BR", "User-Agent": "MeuBusao/1.0 (bus tracker)" },
-            }
+            `${base}/api/reverse-geocode?lat=${latitude}&lon=${longitude}`
+
           );
+
           const data = await res.json();
+
+          console.log('data', data);
+
           const addr = data?.address;
           if (!addr) {
             setUserLocationLabel("Rio de Janeiro");
+            setLocationLoading(false);
             return;
           }
           const suburb = addr.suburb || addr.neighbourhood || addr.quarter;
@@ -80,8 +88,12 @@ export const InitialSearch = ({
         } catch {
           setUserLocationLabel("Rio de Janeiro");
         }
+        setLocationLoading(false);
       },
-      () => setUserLocationLabel("Rio de Janeiro"),
+      () => {
+        setUserLocationLabel("Rio de Janeiro");
+        setLocationLoading(false);
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
     );
   }, []);
@@ -140,12 +152,17 @@ export const InitialSearch = ({
   const handleAddLinha = (numero?: string, nome?: string) => {
     const num = (numero ?? linhaInput).trim();
     if (!num) return;
-    if (linhas.includes(num)) return;
+    if (linhas.includes(num)) {
+      toast.info(`Linha ${num} já está na lista`);
+      return;
+    }
     setLinhas([...linhas, num]);
     if (nome) setLinhasNomes((prev) => ({ ...prev, [num]: nome }));
     setLinhaInput("");
     setSuggestions([]);
     setShowSuggestions(false);
+    const display = nome ? `${num} – ${nome}` : `Linha ${num}`;
+    toast.success(`${display} adicionada à lista`);
   };
 
   const handleAddPopular = (line: LineSuggestion) => {
@@ -178,6 +195,8 @@ export const InitialSearch = ({
     return nome ? `${num} – ${nome}` : `Linha ${num}`;
   };
 
+  console.log('userLocationLabel', userLocationLabel);
+
   const getLineType = (num: string): TransportMode =>
     num.startsWith("T") ? "brt" : "onibus";
 
@@ -189,7 +208,7 @@ export const InitialSearch = ({
           <div className="flex max-w-[70%] items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate" title={userLocationLabel ?? undefined}>
-              {userLocationLabel ?? "..."}
+              {locationLoading ? "Buscando localização..." : (userLocationLabel ?? "Rio de Janeiro")}
             </span>
           </div>
         </header>
@@ -290,14 +309,14 @@ export const InitialSearch = ({
             </div>
 
             {/* Add Button */}
-            <button
+            {/* <button
               type="button"
               onClick={() => handleAddLinha()}
               className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card/50 py-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-[0.98]"
             >
               <Plus className="h-4 w-4" />
               Adicionar
-            </button>
+            </button> */}
           </div>
 
           {/* Selected Lines */}
@@ -377,7 +396,7 @@ export const InitialSearch = ({
                 : "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
             )}
           >
-            ▶ Iniciar Monitoramento
+            <span>▶</span>Iniciar Monitoramento
           </button>
 
           {/* Popular Lines */}

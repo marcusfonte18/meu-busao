@@ -3,7 +3,7 @@
 import { Bus, MapPin, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { getLineColorHex } from "./bus-marker";
+import { getLineHex } from "@/lib/line-colors";
 
 interface MapHeaderProps {
   lineNumbers: string[];
@@ -55,7 +55,7 @@ export function MapHeader({
                   )}
                   style={
                     mode === "onibus"
-                      ? { backgroundColor: getLineColorHex(lineNumbers, linha) }
+                      ? { backgroundColor: getLineHex(linha) }
                       : { backgroundColor: "hsl(var(--secondary))" }
                   }
                 >

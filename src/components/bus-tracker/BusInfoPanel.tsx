@@ -2,7 +2,7 @@
 
 import { Clock, Navigation, Bus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getLineColorsByIndex } from "./bus-marker";
+import { getLineColorsForPanel } from "./bus-marker";
 
 interface BusInfoPanelProps {
   lineNumber: string;
@@ -27,7 +27,7 @@ export function BusInfoPanel({
 }: BusInfoPanelProps) {
   const colors =
     mode === "onibus" && selectedLinhas.length > 0
-      ? getLineColorsByIndex(selectedLinhas, lineNumber)
+      ? getLineColorsForPanel(lineNumber)
       : mode === "onibus"
         ? { bg: "bg-primary", text: "text-primary-foreground", iconColor: "hsl(174,72%,40%)" }
         : { bg: "bg-secondary", text: "text-secondary-foreground", iconColor: "hsl(38,92%,50%)" };
