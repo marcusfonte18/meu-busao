@@ -8,13 +8,6 @@ import { getLineType, type TransportMode } from "./types";
 
 type LineSuggestion = { numero: string; nome: string };
 
-const POPULAR_LINES: LineSuggestion[] = [
-  { numero: "474", nome: "Jacaré - Copacabana" },
-  { numero: "485", nome: "Penha - Cosme Velho" },
-  { numero: "T47", nome: "Alvorada - Jardim Oceânico" },
-  { numero: "384", nome: "Pavuna - Carioca" },
-];
-
 export const InitialSearch = ({
   mode: initialMode,
   onSearch,
@@ -30,8 +23,28 @@ export const InitialSearch = ({
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [userLocationLabel, setUserLocationLabel] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
+  const [popularLines, setPopularLines] = useState<{ numero: string; nome: string | null }[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const fetchPopularLines = async () => {
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL || "";
+      const res = await fetch(`${base}/api/lines/popular`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = data?.lines ?? [];
+      if (Array.isArray(list) && list.length > 0) {
+        setPopularLines(list);
+      }
+    } catch {
+      setPopularLines([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchPopularLines();
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -144,6 +157,16 @@ export const InitialSearch = ({
     setShowSuggestions(false);
     const display = nome ? `${num} – ${nome}` : `Linha ${num}`;
     toast.success(`${display} adicionada à lista`);
+
+    // Registra clique no banco (não bloqueia a UI) e atualiza a lista de populares
+    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    fetch(`${base}/api/lines/click`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ numero: num }),
+    })
+      .then(() => fetchPopularLines())
+      .catch(() => {});
   };
 
   const handleAddPopular = (line: LineSuggestion) => {
@@ -176,10 +199,14 @@ export const InitialSearch = ({
   };
 
   const getLineDisplay = (num: string) => {
-    const pop = POPULAR_LINES.find((p) => p.numero === num);
-    const nome = linhasNomes[num] ?? pop?.nome;
+    const nome = linhasNomes[num];
     return nome ? `${num} – ${nome}` : `Linha ${num}`;
   };
+
+  const linesToShow = popularLines.map((l) => ({
+    numero: l.numero,
+    nome: l.nome ?? `Linha ${l.numero}`,
+  }));
 
 
   return (
@@ -386,32 +413,40 @@ export const InitialSearch = ({
             <span>▶</span>Iniciar Monitoramento
           </button>
 
-          {/* Popular Lines */}
-          {linhas.length === 0 && (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <TrendingUp className="h-4 w-4 text-secondary" />
-                <span>Linhas populares</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {POPULAR_LINES.map((line) => (
+          {/* Linhas populares: toque para adicionar à lista */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <TrendingUp className="h-4 w-4 text-secondary" />
+              <span>Linhas populares</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Toque em uma linha para adicionar ao monitoramento
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {linesToShow.map((line) => {
+                const isBrt = getLineType(line.numero) === "brt";
+                const alreadyAdded = linhas.includes(line.numero);
+                return (
                   <button
                     key={line.numero}
+                    type="button"
                     onClick={() => handleAddPopular(line)}
                     className={cn(
-                      "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:shadow-md active:scale-95",
-                      line.numero.startsWith("T")
-                        ? "border-secondary/20 bg-secondary/5 text-secondary hover:bg-secondary/10"
-                        : "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10"
+                      "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:shadow-md active:scale-[0.98]",
+                      isBrt
+                        ? "bg-secondary text-secondary-foreground hover:opacity-90"
+                        : "bg-primary text-primary-foreground hover:opacity-90",
+                      alreadyAdded && "ring-2 ring-offset-2 ring-primary"
                     )}
+                    aria-label={`Adicionar linha ${line.numero} ${line.nome}`}
                   >
                     <span className="font-bold">{line.numero}</span>
-                    <span className="text-muted-foreground">{line.nome}</span>
+                    <span className="opacity-90">{line.nome}</span>
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </main>
       </div>
     </div>

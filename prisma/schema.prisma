@@ -60,3 +60,11 @@ model RouteShape {
   polylines Json   // [ [ [lat,lng], ... ], ... ] — array de polylines por linha
   @@map("route_shapes")
 }
+
+/// Cliques por linha (para "Linhas populares"). Separado de Line para não perder dados ao atualizar GTFS.
+model LineClick {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  numero String @unique // número da linha (ex: "384", "T47")
+  clicks Int    @default(0)
+  @@map("line_clicks")
+}
