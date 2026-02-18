@@ -410,6 +410,35 @@ export const BusMarkers = ({
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const map = useMap();
 
+  // Wake Lock: mantém a tela ligada no celular enquanto o usuário está no mapa (requer HTTPS)
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    let sentinel: { release: () => Promise<void> } | null = null;
+
+    const requestWakeLock = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        sentinel = await (navigator as any).wakeLock.request("screen");
+      } catch {
+        // Ignora se o navegador recusar (ex.: modo economia de energia)
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+      }
+    };
+
+    requestWakeLock();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      sentinel?.release?.().catch(() => {});
+    };
+  }, []);
+
   // Configuração inicial do mapa - acontece apenas uma vez
   useEffect(() => {
     if (!initialViewSet && buses.length > 0) {
