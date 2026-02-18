@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { BusData, BusHistoryMap } from "./types";
 import { useEffect } from "react";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Locate } from "lucide-react";
 import { getLineType, type TransportMode } from "./types";
 import { getLineHex } from "@/lib/line-colors";
+import { cn } from "@/lib/utils";
 
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
@@ -233,7 +234,7 @@ const getBusIcon = (
 const LocationButton = () => {
   const [isTracking, setIsTracking] = useState(false);
   const map = useMap();
-  let locationMarker: any = null;
+  const locationMarkerRef = useRef<any>(null);
 
   // Solicita geolocalização automaticamente ao carregar o mapa (sem precisar clicar no ícone)
   useEffect(() => {
@@ -249,13 +250,19 @@ const LocationButton = () => {
     }
   }, [map]);
 
+  const removeLocationMarker = () => {
+    const marker = locationMarkerRef.current;
+    if (marker && map.hasLayer(marker)) {
+      map.removeLayer(marker);
+    }
+    locationMarkerRef.current = null;
+  };
+
   const createLocationMarker = (latlng: any, accuracy: number) => {
     if (typeof window === "undefined") return;
     const L = require("leaflet");
 
-    if (locationMarker) {
-      map.removeLayer(locationMarker);
-    }
+    removeLocationMarker();
 
     const locationIcon = new L.DivIcon({
       className: "location-marker",
@@ -269,14 +276,15 @@ const LocationButton = () => {
       iconAnchor: [12, 12],
     });
 
-    locationMarker = L.marker(latlng, { icon: locationIcon })
+    const marker = L.marker(latlng, { icon: locationIcon })
       .addTo(map)
       .bindPopup(`Precisão: ~${Math.round(accuracy)} metros`);
+    locationMarkerRef.current = marker;
 
     // Ajusta a visualização apenas na primeira detecção de localização
-    if (isTracking && !locationMarker._initialViewSet) {
+    if (isTracking && !(marker as any)._initialViewSet) {
       map.setView(latlng);
-      locationMarker._initialViewSet = true; // Marca que a visualização inicial foi ajustada
+      (marker as any)._initialViewSet = true;
     }
   };
 
@@ -287,24 +295,22 @@ const LocationButton = () => {
     locationerror: () => {
       toast.error("Não foi possível obter sua localização");
       setIsTracking(false);
-      localStorage.setItem("isTracking", "false"); // Salva o estado como inativo em caso de erro
+      localStorage.setItem("isTracking", "false");
     },
   });
 
   const toggleLocation = () => {
     if (!isTracking) {
-      map.locate({ enableHighAccuracy: true, setView: false }); // Desativa a atualização automática da visualização
+      map.locate({ enableHighAccuracy: true, setView: false });
       toast.success("Rastreando sua localização");
     } else {
       map.stopLocate();
-      if (locationMarker) {
-        map.removeLayer(locationMarker);
-      }
+      removeLocationMarker();
       toast.info("Parou de rastrear localização");
     }
     const newTrackingState = !isTracking;
     setIsTracking(newTrackingState);
-    localStorage.setItem("isTracking", newTrackingState.toString()); // Salva o novo estado no localStorage
+    localStorage.setItem("isTracking", newTrackingState.toString());
   };
 
   return (
@@ -312,7 +318,12 @@ const LocationButton = () => {
       <div className="leaflet-control leaflet-bar !border-none">
         <button
           onClick={toggleLocation}
-          className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-colors hover:bg-primary/90"
+          className={cn(
+            "flex h-11 w-11 items-center justify-center rounded-xl transition-colors",
+            isTracking
+              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          )}
           title={isTracking ? "Parar de rastrear" : "Rastrear localização"}
         >
           <Locate className="h-5 w-5" />
