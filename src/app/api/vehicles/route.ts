@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { fetchBusData } from "@/app/api/buses/service";
-import { fetchBrtData } from "@/app/api/brt/service";
+import { fetchBusData } from "../buses/service";
+import { fetchBrtData } from "../brt/service";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

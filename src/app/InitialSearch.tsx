@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Plus, X, Search, Sparkles, TrendingUp, Clock, MapPin, Bus, Train } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getApiBase } from "@/lib/utils";
 import { getLineType, type TransportMode } from "./types";
 
 type LineSuggestion = { numero: string; nome: string };
@@ -29,7 +29,7 @@ export const InitialSearch = ({
 
   const fetchPopularLines = async () => {
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL || "";
+      const base = getApiBase();
       const res = await fetch(`${base}/api/lines/popular`);
       if (!res.ok) return;
       const data = await res.json();
@@ -57,7 +57,7 @@ export const InitialSearch = ({
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         try {
-          const base = process.env.NEXT_PUBLIC_API_URL || "";
+          const base = getApiBase();
           const res = await fetch(
             `${base}/api/reverse-geocode?lat=${latitude}&lon=${longitude}`
 
@@ -112,7 +112,7 @@ export const InitialSearch = ({
     setLoadingSuggestions(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const base = process.env.NEXT_PUBLIC_API_URL || "";
+        const base = getApiBase();
         const res = await fetch(
           `${base}/api/lines?q=${encodeURIComponent(q)}&modo=${modoParam}&limit=20`
         );
@@ -159,7 +159,7 @@ export const InitialSearch = ({
     toast.success(`${display} adicionada à lista`);
 
     // Registra clique no banco (não bloqueia a UI) e atualiza a lista de populares
-    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    const base = getApiBase();
     fetch(`${base}/api/lines/click`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

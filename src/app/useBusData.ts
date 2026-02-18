@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
+import { getApiBase } from "@/lib/utils";
 import { BusData } from "./types";
 
 /**
@@ -14,7 +15,7 @@ export function useBusData(linhas: Array<string>) {
     queryKey: ["buses", linhas.join(",")],
     placeholderData: keepPreviousData,
     queryFn: async () => {
-      const base = process.env.NEXT_PUBLIC_API_URL || "";
+      const base = getApiBase();
       const queryParams = new URLSearchParams();
       if (linhas.length > 0) queryParams.set("linhas", linhas.join(","));
       const response = await fetch(`${base}/api/vehicles?${queryParams.toString()}`);

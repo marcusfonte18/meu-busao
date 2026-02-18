@@ -14,6 +14,7 @@ import {
 import { BusInfoPanel } from "@/components/bus-tracker/BusInfoPanel";
 import { MapHeader } from "@/components/bus-tracker/MapHeader";
 import { registerLines } from "@/lib/line-colors";
+import { getApiBase } from "@/lib/utils";
 import { getLineType, type TransportMode } from "./types";
 import dynamic from "next/dynamic";
 
@@ -118,7 +119,7 @@ export const BusMap = ({
       setRouteShapes({});
       return;
     }
-    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    const base = getApiBase();
     const linhas = selectedLinha.join(",");
     fetch(`${base}/api/route-shapes?linhas=${encodeURIComponent(linhas)}`)
       .then((res) => (res.ok ? res.json() : {}))
@@ -131,7 +132,7 @@ export const BusMap = ({
       setLineDirectionLabels({});
       return;
     }
-    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    const base = getApiBase();
     const acc: Record<string, { ida: string; volta: string }> = {};
     Promise.all(
       selectedLinha.map((numero) => {

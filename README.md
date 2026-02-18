@@ -27,6 +27,18 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Build do app (Capacitor / Android)
+
+O app usa export estático (sem servidor Next no dispositivo). A **busca e os dados** vêm da API em produção.
+
+1. Faça o deploy do projeto na web (ex.: Vercel) para ter a API disponível em uma URL (ex: `https://meubusao.vercel.app`).
+2. Defina a URL da API ao buildar o app:
+   - No `.env`: `NEXT_PUBLIC_API_URL=https://sua-url-de-producao.com`
+   - Ou na hora: `NEXT_PUBLIC_API_URL=https://sua-url-de-producao.com pnpm build:app`
+3. Rode o build do app: `pnpm build:app`
+
+Sem `NEXT_PUBLIC_API_URL` o script de build do app falha e mostra instruções.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
