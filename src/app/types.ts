@@ -1,5 +1,10 @@
 export type TransportMode = "onibus" | "brt";
 
+/** Retorna o tipo de transporte pela numeração (ex: T47 ou t47 → BRT, 384 → ônibus). */
+export function getLineType(numero: string): TransportMode {
+  return numero.trim().toUpperCase().startsWith("T") ? "brt" : "onibus";
+}
+
 export type BusData = {
   id: string;
   ordem: string;

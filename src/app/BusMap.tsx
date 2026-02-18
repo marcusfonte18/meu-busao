@@ -14,7 +14,7 @@ import {
 import { BusInfoPanel } from "@/components/bus-tracker/BusInfoPanel";
 import { MapHeader } from "@/components/bus-tracker/MapHeader";
 import { registerLines } from "@/lib/line-colors";
-import type { TransportMode } from "./types";
+import { getLineType, type TransportMode } from "./types";
 import dynamic from "next/dynamic";
 
 /** Converte nome da linha (ex: "Pavuna - Passeio") em labels dos sentidos. */
@@ -39,16 +39,24 @@ const TileLayer = dynamic(
   { ssr: false }
 );
 
-const LoadingState = ({ mode }: { mode: TransportMode }) => (
-  <div className="relative flex h-[100dvh] items-center justify-center bg-background overflow-hidden">
-    <div className="flex flex-col items-center justify-center space-y-4 text-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <p className="text-muted-foreground">
-        {mode === "brt" ? "Carregando dados do BRT..." : "Carregando dados dos ônibus..."}
-      </p>
+const LoadingState = ({ selectedLinha }: { selectedLinha: string[] }) => {
+  const hasOnibus = selectedLinha.some((l) => getLineType(l) === "onibus");
+  const hasBrt = selectedLinha.some((l) => getLineType(l) === "brt");
+  const label =
+    hasOnibus && hasBrt
+      ? "Carregando dados dos ônibus e BRT..."
+      : hasBrt
+        ? "Carregando dados do BRT..."
+        : "Carregando dados dos ônibus...";
+  return (
+    <div className="relative flex h-[100dvh] items-center justify-center bg-background overflow-hidden">
+      <div className="flex flex-col items-center justify-center space-y-4 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">{label}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 function MapFooter() {
   return (
@@ -90,7 +98,7 @@ export const BusMap = ({
   } | null) => void;
   initialCenter?: [number, number] | { lat: number; lng: number };
 }) => {
-  const { data: buses, isLoading } = useBusData(selectedLinha, mode);
+  const { data: buses, isLoading } = useBusData(selectedLinha);
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const [selectedDirections, setSelectedDirections] = useState<SelectedDirections>({
@@ -126,17 +134,18 @@ export const BusMap = ({
     const base = process.env.NEXT_PUBLIC_API_URL || "";
     const acc: Record<string, { ida: string; volta: string }> = {};
     Promise.all(
-      selectedLinha.map((numero) =>
-        fetch(`${base}/api/lines?q=${encodeURIComponent(numero)}&modo=${mode}&limit=1`)
+      selectedLinha.map((numero) => {
+        const modo = getLineType(numero);
+        return fetch(`${base}/api/lines?q=${encodeURIComponent(numero)}&modo=${modo}&limit=1`)
           .then((res) => (res.ok ? res.json() : { lines: [] }))
           .then((data: { lines: { numero: string; nome: string }[] }) => {
             const line = data.lines?.[0];
             if (line?.nome) acc[numero] = parseDirectionLabels(line.nome);
             else acc[numero] = { ida: "Ida", volta: "Volta" };
-          })
-      )
+          });
+      })
     ).then(() => setLineDirectionLabels(acc));
-  }, [selectedLinha.join(","), mode]);
+  }, [selectedLinha.join(",")]);
 
   useEffect(() => {
     if (!selectedBusId || !buses) {
@@ -169,7 +178,7 @@ export const BusMap = ({
   }, [selectedBusId, buses, onBusInfoChange]);
 
   if (isLoading || !buses || buses.length === 0) {
-    return <LoadingState mode={mode} />;
+    return <LoadingState selectedLinha={selectedLinha} />;
   }
 
   registerLines(selectedLinha);

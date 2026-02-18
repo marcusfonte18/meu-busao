@@ -30,7 +30,7 @@ export function BottomNav({ active, busInfo, onBuscarClick }: BottomNavProps) {
   return (
     <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-50 flex flex-col border-t border-border bg-card/95 backdrop-blur-lg">
     
-      <div className={cn("mx-auto flex max-w-md flex-1 items-center justify-around px-2", showBusInfo ? "h-14 shrink-0" : "h-14 flex-1")}>
+      <div className={cn("mx-auto flex w-full max-w-md flex-1 items-stretch", showBusInfo ? "h-14 shrink-0" : "h-14 flex-1")}>
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.id === active;
@@ -54,16 +54,16 @@ export function BottomNav({ active, busInfo, onBuscarClick }: BottomNavProps) {
             </>
           );
 
+          const baseNavClass =
+            "flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 transition-all duration-200";
+
           if (isMapaAndBuscarClick) {
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={onBuscarClick}
-                className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 transition-all duration-200",
-                  "text-muted-foreground hover:text-foreground"
-                )}
+                className={cn(baseNavClass, "text-muted-foreground hover:text-foreground")}
                 aria-label={item.label}
               >
                 {content}
@@ -76,7 +76,7 @@ export function BottomNav({ active, busInfo, onBuscarClick }: BottomNavProps) {
               key={item.id}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 transition-all duration-200",
+                baseNavClass,
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
               aria-label={item.label}

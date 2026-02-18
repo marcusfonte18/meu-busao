@@ -2,19 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import {
-  Plus,
-  X,
-  Search,
-  Sparkles,
-  Bus,
-  Train,
-  TrendingUp,
-  Clock,
-  MapPin,
-} from "lucide-react";
+import { Plus, X, Search, Sparkles, TrendingUp, Clock, MapPin, Bus, Train } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { TransportMode } from "./types";
+import { getLineType, type TransportMode } from "./types";
 
 type LineSuggestion = { numero: string; nome: string };
 
@@ -32,7 +22,6 @@ export const InitialSearch = ({
   mode: TransportMode;
   onSearch: (linhas: string[], mode: TransportMode) => void;
 }) => {
-  const [mode, setMode] = useState<TransportMode>(initialMode);
   const [linhaInput, setLinhaInput] = useState("");
   const [linhas, setLinhas] = useState<string[]>([]);
   const [linhasNomes, setLinhasNomes] = useState<Record<string, string>>({});
@@ -43,10 +32,6 @@ export const InitialSearch = ({
   const [locationLoading, setLocationLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMode(initialMode);
-  }, [initialMode]);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -98,15 +83,11 @@ export const InitialSearch = ({
     );
   }, []);
 
-  useEffect(() => {
-    setLinhaInput("");
-    setSuggestions([]);
-    setShowSuggestions(false);
-  }, [mode]);
+  const modoParam = "onibus,brt";
+  const minChars = 1;
 
   useEffect(() => {
     const q = linhaInput.trim();
-    const minChars = mode === "brt" ? 1 : 2;
     if (q.length < minChars) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -120,7 +101,7 @@ export const InitialSearch = ({
       try {
         const base = process.env.NEXT_PUBLIC_API_URL || "";
         const res = await fetch(
-          `${base}/api/lines?q=${encodeURIComponent(q)}&modo=${mode}&limit=20`
+          `${base}/api/lines?q=${encodeURIComponent(q)}&modo=${modoParam}&limit=20`
         );
         const data = await res.json().catch(() => ({ lines: [] }));
         const list = data.lines || [];
@@ -137,7 +118,7 @@ export const InitialSearch = ({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [linhaInput, mode]);
+  }, [linhaInput, modoParam, minChars]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -189,7 +170,8 @@ export const InitialSearch = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (linhas.length > 0) {
-      onSearch(linhas, mode);
+      const primaryMode: TransportMode = getLineType(linhas[0]) ?? "onibus";
+      onSearch(linhas, primaryMode);
     }
   };
 
@@ -199,9 +181,6 @@ export const InitialSearch = ({
     return nome ? `${num} – ${nome}` : `Linha ${num}`;
   };
 
-
-  const getLineType = (num: string): TransportMode =>
-    num.startsWith("T") ? "brt" : "onibus";
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -228,32 +207,41 @@ export const InitialSearch = ({
             </p>
           </div>
 
-          {/* Transport Type Toggle */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => setMode("onibus")}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all duration-200",
-                mode === "onibus"
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                  : "border border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
-              )}
-            >
-              <Bus className="h-4 w-4" />
-              Ônibus
-            </button>
-            <button
-              onClick={() => setMode("brt")}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all duration-200",
-                mode === "brt"
-                  ? "bg-secondary text-secondary-foreground shadow-lg shadow-secondary/25"
-                  : "border border-border bg-card text-muted-foreground hover:border-secondary/30 hover:text-foreground"
-              )}
-            >
-              <Train className="h-4 w-4" />
-              BRT
-            </button>
+          {/* Busca sempre para ônibus e BRT (sem opção de trocar) */}
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-3">
+              <div
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold",
+                  "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                )}
+              >
+                <Bus className="h-4 w-4" />
+                <span>Ônibus</span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-foreground/20 text-[10px] font-bold">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              </div>
+              <div
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold",
+                  "bg-secondary text-secondary-foreground shadow-lg shadow-secondary/25"
+                )}
+              >
+                <Train className="h-4 w-4" />
+                <span>BRT</span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary-foreground/20 text-[10px] font-bold">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <p className="text-center text-xs text-muted-foreground">
+              Mostrando linhas de Ônibus e BRT
+            </p>
           </div>
 
           {/* Search */}
@@ -265,16 +253,11 @@ export const InitialSearch = ({
                 value={linhaInput}
                 onChange={(e) => setLinhaInput(e.target.value)}
                 onFocus={() => linhaInput.trim() && setShowSuggestions(true)}
-                placeholder={
-                  mode === "brt"
-                    ? "Estação ou linha BRT (ex: T47)"
-                    : "Número ou destino (ex: 384 ou Pavuna)"
-                }
+                placeholder="Número ou destino (ex: 384, T47, Pavuna)"
                 autoComplete="off"
                 className="w-full rounded-xl border border-border bg-card py-3.5 pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               />
-              {showSuggestions &&
-                linhaInput.trim().length >= (mode === "brt" ? 1 : 2) && (
+              {showSuggestions && linhaInput.trim().length >= minChars && (
                   <ul
                     className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-card py-1 shadow-lg max-h-56 overflow-auto"
                     role="listbox"

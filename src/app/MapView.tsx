@@ -8,7 +8,7 @@ import "leaflet/dist/leaflet.css";
 import { useMap, useMapEvents } from "react-leaflet";
 import { toast } from "sonner";
 import { Locate } from "lucide-react";
-import type { TransportMode } from "./types";
+import { getLineType, type TransportMode } from "./types";
 import { getLineHex } from "@/lib/line-colors";
 
 const Marker = dynamic(
@@ -30,54 +30,6 @@ const SECONDARY_COLOR = "#eab308";
 
 /** Opções comuns para suavidade do traço (lineCap/lineJoin arredondados) */
 const SMOOTH_PATH = { lineCap: "round" as const, lineJoin: "round" as const };
-
-/** Número de setas de direção ao longo de cada traçado */
-const DIRECTION_ARROWS_COUNT = 10;
-
-/**
- * Amostra pontos ao longo da polyline e retorna posição + ângulo (direção do percurso).
- * Usado para desenhar flechas indicando o sentido da linha.
- */
-function sampleDirectionArrows(
-  positions: [number, number][],
-  maxArrows: number = DIRECTION_ARROWS_COUNT
-): { lat: number; lng: number; angle: number }[] {
-  if (positions.length < 2) return [];
-  const result: { lat: number; lng: number; angle: number }[] = [];
-  const step = (positions.length - 1) / (maxArrows + 1);
-  for (let k = 1; k <= maxArrows; k++) {
-    const i = Math.min(Math.floor(k * step), positions.length - 2);
-    const [lat, lng] = positions[i];
-    const [nextLat, nextLng] = positions[i + 1];
-    const angle = getBearing(lat, lng, nextLat, nextLng);
-    result.push({ lat, lng, angle });
-  }
-  return result;
-}
-
-/**
- * Ícone de seta (triângulo) para indicar direção da linha. angle em graus (0 = Norte).
- * Usa SVG em data URL para renderização estável no Leaflet.
- */
-function getDirectionArrowIcon(angleDeg: number, color: string) {
-  if (typeof window === "undefined") return null;
-  const L = require("leaflet");
-  const size = 20;
-  const center = size / 2;
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <g transform="rotate(${angleDeg} ${center} ${center})">
-        <path d="M${center} 4 L${size - 4} ${size - 4} L8 ${size - 4} Z" fill="${color}" stroke="rgba(0,0,0,0.25)" stroke-width="0.8"/>
-      </g>
-    </svg>`;
-  const encoded = encodeURIComponent(svg.trim()).replace(/'/g, "%27");
-  return new L.DivIcon({
-    className: "direction-arrow-icon",
-    html: `<img src="data:image/svg+xml,${encoded}" width="${size}" height="${size}" alt="" />`,
-    iconSize: [size, size],
-    iconAnchor: [center, center],
-  });
-}
 
 /** Ângulo em graus (0 = Norte, 90 = Leste) a partir de dois pontos. */
 function getBearing(
@@ -588,8 +540,9 @@ export const BusMarkers = ({
     <>
       {/* Traçado oficial da linha (GTFS): ambas iguais e finas */}
       {Object.entries(routeShapes).flatMap(([linha, polylines]) => {
+        const lineMode = getLineType(linha);
         const lineColor =
-          mode === "onibus"
+          lineMode === "onibus"
             ? getLineHex(linha)
             : SECONDARY_COLOR;
         const swapped = polyOrderSwapped[linha];
@@ -598,7 +551,6 @@ export const BusMarkers = ({
           const geoIsIda = (idx === 0 && !swapped) || (idx === 1 && swapped);
           const isSelected = geoIsIda ? selectedDirections.ida : selectedDirections.volta;
           if (!isSelected) return [];
-          const arrowPoints = sampleDirectionArrows(positions);
           const lineKey = `route-${linha}-${idx}`;
           return [
             <Polyline
@@ -621,18 +573,6 @@ export const BusMarkers = ({
                 ...SMOOTH_PATH,
               }}
             />,
-            ...arrowPoints.flatMap((p, ai) => {
-              const icon = getDirectionArrowIcon(p.angle, lineColor);
-              if (!icon) return [];
-              return [
-                <Marker
-                  key={`${lineKey}-arrow-${ai}`}
-                  position={[p.lat, p.lng]}
-                  icon={icon}
-                  interactive={false}
-                />,
-              ];
-            }),
           ];
         });
       })}
@@ -641,8 +581,9 @@ export const BusMarkers = ({
         const history = busHistory[bus.id] || [];
         const positions = history.map((h) => h.position as [number, number]);
         if (positions.length < 2) return null;
+        const lineMode = getLineType(bus.linha);
         const lineColor =
-          mode === "onibus"
+          lineMode === "onibus"
             ? getLineHex(bus.linha)
             : SECONDARY_COLOR;
         return (
@@ -662,8 +603,9 @@ export const BusMarkers = ({
         const isSelected = selectedBus === bus.id;
         const heading = bus.heading ?? getHeadingForBus(bus.id) ?? 0;
         const speed = Number(bus.velocidade) || 0;
+        const busMode = getLineType(bus.linha);
         const fillColor =
-          mode === "onibus"
+          busMode === "onibus"
             ? getLineHex(bus.linha)
             : SECONDARY_COLOR;
 
@@ -671,7 +613,7 @@ export const BusMarkers = ({
           <Marker
             key={bus.id}
             position={[bus.latitude, bus.longitude]}
-            icon={getBusIcon(bus.linha, mode, isSelected, speed, heading, fillColor)}
+            icon={getBusIcon(bus.linha, busMode, isSelected, speed, heading, fillColor)}
             eventHandlers={{
               click: () => onSelectBus(isSelected ? null : bus.id),
             }}

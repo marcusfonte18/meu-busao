@@ -4,10 +4,11 @@ import { Bus, MapPin, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { getLineHex } from "@/lib/line-colors";
+import { getLineType } from "@/app/types";
 
 interface MapHeaderProps {
   lineNumbers: string[];
-  mode: "onibus" | "brt";
+  mode?: "onibus" | "brt";
   onClear: () => void;
   onChangeLine: () => void;
   onRemoveLine?: (linha: string) => void;
@@ -15,12 +16,16 @@ interface MapHeaderProps {
 
 export function MapHeader({
   lineNumbers,
-  mode,
+  mode: _mode,
   onClear,
   onChangeLine,
   onRemoveLine,
 }: MapHeaderProps) {
   const canRemoveIndividual = lineNumbers.length > 1 && onRemoveLine;
+  const hasOnibus = lineNumbers.some((l) => getLineType(l) === "onibus");
+  const hasBrt = lineNumbers.some((l) => getLineType(l) === "brt");
+  const modeLabel =
+    hasOnibus && hasBrt ? "Bus + BRT" : hasBrt ? "BRT" : "Bus";
 
   return (
     <header className="relative z-10 border-b border-border bg-card shadow-sm">
@@ -39,25 +44,25 @@ export function MapHeader({
               <span
                 className={cn(
                   "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase shrink-0",
-                  mode === "onibus"
-                    ? "bg-primary/10 text-primary"
-                    : "bg-secondary/10 text-secondary"
+                  hasBrt && !hasOnibus
+                    ? "bg-secondary/10 text-secondary"
+                    : "bg-primary/10 text-primary"
                 )}
               >
-                {mode === "brt" ? "BRT" : "Bus"}
+                {modeLabel}
               </span>
-              {lineNumbers.map((linha) => (
+              {lineNumbers.map((linha) => {
+                const isBrt = getLineType(linha) === "brt";
+                return (
                 <span
                   key={linha}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold text-white",
                     canRemoveIndividual && "pr-1"
                   )}
-                  style={
-                    mode === "onibus"
-                      ? { backgroundColor: getLineHex(linha) }
-                      : { backgroundColor: "hsl(var(--secondary))" }
-                  }
+                  style={{
+                    backgroundColor: isBrt ? "hsl(var(--secondary))" : getLineHex(linha),
+                  }}
                 >
                   {linha}
                   {canRemoveIndividual && (
@@ -75,7 +80,8 @@ export function MapHeader({
                     </button>
                   )}
                 </span>
-              ))}
+                );
+              })}
             </span>
           </div>
         </div>
