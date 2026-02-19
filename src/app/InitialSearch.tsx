@@ -436,7 +436,10 @@ export const InitialSearch = ({
                       isBrt
                         ? "bg-secondary text-secondary-foreground hover:opacity-90"
                         : "bg-primary text-primary-foreground hover:opacity-90",
-                      alreadyAdded && "ring-2 ring-offset-2 ring-primary"
+                      alreadyAdded && [
+                        "ring-2 ring-offset-2 ring-offset-background",
+                        isBrt ? "ring-secondary" : "ring-primary",
+                      ]
                     )}
                     aria-label={`Adicionar linha ${line.numero} ${line.nome}`}
                   >

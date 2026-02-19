@@ -683,7 +683,7 @@ export const BusMarkers = ({
             <CircleMarker
               key={`stop-${linha}-${idx}`}
               center={center}
-              radius={5}
+              radius={3}
               pathOptions={{
                 color: lineColor,
                 fillColor: "#fff",
