@@ -26,6 +26,11 @@ const Polyline = dynamic(
   { ssr: false }
 );
 
+const CircleMarker = dynamic(
+  () => import("react-leaflet").then((mod) => mod.CircleMarker),
+  { ssr: false }
+);
+
 /** Cores do tema: secondary (BRT). Ônibus usa getLineHex (paleta de 8 cores). */
 const SECONDARY_COLOR = "#eab308";
 
@@ -82,6 +87,38 @@ function minDistSqToPolyline(
     if (sq < minSq) minSq = sq;
   }
   return minSq;
+}
+
+/** Ponto da polyline mais próximo do ponto dado — para colar a parada em cima da linha. */
+function getClosestPointOnPolyline(
+  lat: number,
+  lng: number,
+  positions: [number, number][]
+): [number, number] | null {
+  if (positions.length === 0) return null;
+  if (positions.length === 1) return [positions[0][0], positions[0][1]];
+  let minSq = Infinity;
+  let best: [number, number] = [positions[0][0], positions[0][1]];
+  for (let i = 0; i < positions.length - 1; i++) {
+    const [a0, a1] = positions[i];
+    const [b0, b1] = positions[i + 1];
+    const t = Math.max(
+      0,
+      Math.min(
+        1,
+        ((lat - a0) * (b0 - a0) + (lng - a1) * (b1 - a1)) /
+          (((b0 - a0) ** 2 + (b1 - a1) ** 2) || 1)
+      )
+    );
+    const p0 = a0 + t * (b0 - a0);
+    const p1 = a1 + t * (b1 - a1);
+    const sq = (lat - p0) ** 2 + (lng - p1) ** 2;
+    if (sq < minSq) {
+      minSq = sq;
+      best = [p0, p1];
+    }
+  }
+  return best;
 }
 
 /** Bearing da direção inicial da polyline (do início em direção ao fim). */
@@ -369,9 +406,12 @@ export type DirectionFilter = "all" | "ida" | "volta";
 /** Sentidos selecionados: ida e/ou volta. Ambos true = mostrar os dois. */
 export type SelectedDirections = { ida: boolean; volta: boolean };
 
+export type RouteStopsMap = Record<string, [number, number][]>;
+
 export const BusMarkers = ({
   buses,
   routeShapes = {},
+  routeStops = {},
   mode = "onibus",
   selectedBus,
   onSelectBus,
@@ -380,6 +420,7 @@ export const BusMarkers = ({
 }: {
   buses: BusData[];
   routeShapes?: RouteShapesMap;
+  routeStops?: RouteStopsMap;
   mode?: TransportMode;
   selectedBus: string | null;
   onSelectBus: (id: string | null) => void;
@@ -578,7 +619,7 @@ export const BusMarkers = ({
 
   return (
     <>
-      {/* Traçado oficial da linha (GTFS): ambas iguais e finas */}
+      {/* Traçado oficial da linha (GTFS): desenha primeiro para ficar por baixo */}
       {Object.entries(routeShapes).flatMap(([linha, polylines]) => {
         const lineMode = getLineType(linha);
         const lineColor =
@@ -614,6 +655,44 @@ export const BusMarkers = ({
               }}
             />,
           ];
+        });
+      })}
+      {/* Paradas: coladas na linha (ponto mais próximo da rota) para a linha passar pelo centro */}
+      {Object.entries(routeStops).flatMap(([linha, positions]) => {
+        const polylines = routeShapes[linha];
+        const poly0 = polylines?.[0];
+        const poly1 = polylines?.[1];
+        const swapped = polyOrderSwapped[linha];
+        const hasDirection = poly0 && poly0.length >= 2 && poly1 && poly1.length >= 2;
+        const lineColor = getLineType(linha) === "brt" ? SECONDARY_COLOR : getLineHex(linha);
+        return positions.map(([lat, lng], idx) => {
+          let center: [number, number] = [lat, lng];
+          if (hasDirection) {
+            const dist0 = minDistSqToPolyline(lat, lng, poly0);
+            const dist1 = minDistSqToPolyline(lat, lng, poly1);
+            const geoIsIda = dist0 <= dist1 ? !swapped : swapped;
+            const isSelected = geoIsIda ? selectedDirections.ida : selectedDirections.volta;
+            if (!isSelected) return null;
+            const poly = dist0 <= dist1 ? poly0 : poly1;
+            const onLine = getClosestPointOnPolyline(lat, lng, poly);
+            if (onLine) center = onLine;
+          } else {
+            if (!selectedDirections.ida && !selectedDirections.volta) return null;
+          }
+          return (
+            <CircleMarker
+              key={`stop-${linha}-${idx}`}
+              center={center}
+              radius={5}
+              pathOptions={{
+                color: lineColor,
+                fillColor: "#fff",
+                fillOpacity: 1,
+                weight: 2,
+                opacity: 1,
+              }}
+            />
+          );
         });
       })}
       {/* Trilha (caminho já percorrido) de cada ônibus - mesma cor e suavidade */}

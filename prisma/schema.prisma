@@ -61,6 +61,14 @@ model RouteShape {
   @@map("route_shapes")
 }
 
+/// Paradas (pontos de ônibus) por linha. Populado por: pnpm run seed:route-stops (em dev, com pasta GTFS).
+model RouteStop {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  linha     String @unique
+  positions Json   // [ [lat,lng], ... ] — paradas da linha
+  @@map("route_stops")
+}
+
 /// Cliques por linha (para "Linhas populares"). Separado de Line para não perder dados ao atualizar GTFS.
 model LineClick {
   id     String @id @default(auto()) @map("_id") @db.ObjectId

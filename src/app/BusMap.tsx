@@ -9,6 +9,7 @@ import {
   BusMarkers,
   formatLastUpdate,
   type RouteShapesMap,
+  type RouteStopsMap,
   type SelectedDirections,
 } from "./MapView";
 import { BusInfoPanel } from "@/components/bus-tracker/BusInfoPanel";
@@ -101,6 +102,7 @@ export const BusMap = ({
 }) => {
   const { data: buses, isLoading } = useBusData(selectedLinha);
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
+  const [routeStops, setRouteStops] = useState<RouteStopsMap>({});
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const [selectedDirections, setSelectedDirections] = useState<SelectedDirections>({
     ida: true,
@@ -125,6 +127,19 @@ export const BusMap = ({
       .then((res) => (res.ok ? res.json() : {}))
       .then((data: RouteShapesMap) => setRouteShapes(data))
       .catch(() => setRouteShapes({}));
+  }, [selectedLinha.join(",")]);
+
+  useEffect(() => {
+    if (selectedLinha.length === 0) {
+      setRouteStops({});
+      return;
+    }
+    const base = getApiBase();
+    const linhas = selectedLinha.join(",");
+    fetch(`${base}/api/route-stops?linhas=${encodeURIComponent(linhas)}`)
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((data: RouteStopsMap) => setRouteStops(data))
+      .catch(() => setRouteStops({}));
   }, [selectedLinha.join(",")]);
 
   useEffect(() => {
@@ -242,6 +257,7 @@ export const BusMap = ({
               <BusMarkers
                 buses={buses}
                 routeShapes={routeShapes}
+                routeStops={routeStops}
                 mode={mode}
                 selectedBus={selectedBusId}
                 onSelectBus={setSelectedBusId}

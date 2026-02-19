@@ -15,6 +15,7 @@
     "sync:brt:loop": "node scripts/sync-brt.js --loop",
     "seed:lines": "node scripts/seed-lines.js",
     "seed:route-shapes": "node scripts/seed-route-shapes.js",
+    "seed:route-stops": "node scripts/seed-route-stops.js",
     "android": "npx cap open android",
     "ios": "npx cap open ios"
   },
