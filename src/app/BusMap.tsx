@@ -84,6 +84,8 @@ export const BusMap = ({
   onTrocarLinhas,
   onBusInfoChange,
   initialCenter = [-22.9068, -43.1729],
+  favoritos = [],
+  onToggleFavorito,
 }: {
   mode?: TransportMode;
   selectedLinha: Array<string>;
@@ -99,6 +101,8 @@ export const BusMap = ({
     lastUpdate: string;
   } | null) => void;
   initialCenter?: [number, number] | { lat: number; lng: number };
+  favoritos?: string[];
+  onToggleFavorito?: (numero: string) => void;
 }) => {
   const { data: buses, isLoading } = useBusData(selectedLinha);
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
@@ -208,6 +212,8 @@ export const BusMap = ({
           onClear={onClearSelectedLinha}
           onChangeLine={onTrocarLinhas ?? (() => {})}
           onRemoveLine={onRemoveLine}
+          favoritos={favoritos}
+          onToggleFavorito={onToggleFavorito}
         />
         {/* Filtro de sentido: ambos selecionados por padrão; clique para alternar */}
         <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/30 px-4 py-2">

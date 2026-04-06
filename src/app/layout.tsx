@@ -9,6 +9,10 @@ const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space
 export const metadata: Metadata = {
   title: "BusTracker Rio",
   description: "Monitore linhas de ônibus e BRT em tempo real no Rio de Janeiro",
+  icons: {
+    icon: "/favicon/favicon.svg",
+  },
+  manifest: "/favicon/site.webmanifest",
   openGraph: {
     title: "BusTracker Rio",
     description: "Monitore linhas de ônibus e BRT em tempo real no Rio de Janeiro",

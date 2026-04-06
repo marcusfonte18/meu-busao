@@ -9,6 +9,7 @@ import { useMap, useMapEvents } from "react-leaflet";
 import { toast } from "sonner";
 import { Locate } from "lucide-react";
 import { getLineType, type TransportMode } from "./types";
+import { getCurrentPosition, isNativePlatform, requestLocationPermission } from "@/lib/geolocation";
 import { getLineHex } from "@/lib/line-colors";
 import { cn } from "@/lib/utils";
 
@@ -272,20 +273,7 @@ const LocationButton = () => {
   const [isTracking, setIsTracking] = useState(false);
   const map = useMap();
   const locationMarkerRef = useRef<any>(null);
-
-  // Solicita geolocalização automaticamente ao carregar o mapa (sem precisar clicar no ícone)
-  useEffect(() => {
-    map.locate({ enableHighAccuracy: true, setView: false });
-  }, [map]);
-
-  // Restaurar o estado do rastreamento ao carregar o componente
-  useEffect(() => {
-    const savedTrackingState = localStorage.getItem("isTracking");
-    if (savedTrackingState === "true") {
-      setIsTracking(true);
-      map.locate({ enableHighAccuracy: true, setView: false });
-    }
-  }, [map]);
+  const isNative = isNativePlatform();
 
   const removeLocationMarker = () => {
     const marker = locationMarkerRef.current;
@@ -318,30 +306,82 @@ const LocationButton = () => {
       .bindPopup(`Precisão: ~${Math.round(accuracy)} metros`);
     locationMarkerRef.current = marker;
 
-    // Ajusta a visualização apenas na primeira detecção de localização
     if (isTracking && !(marker as any)._initialViewSet) {
       map.setView(latlng);
       (marker as any)._initialViewSet = true;
     }
   };
 
-  useMapEvents({
-    locationfound: (e) => {
-      createLocationMarker(e.latlng, e.accuracy);
-    },
-    locationerror: () => {
-      toast.error("Não foi possível obter sua localização");
-      setIsTracking(false);
-      localStorage.setItem("isTracking", "false");
-    },
-  });
+  const fetchAndShowLocation = () => {
+    getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 })
+      .then(({ latitude, longitude }) => {
+        const latlng = [latitude, longitude] as [number, number];
+        createLocationMarker(latlng, 0);
+        map.setView(latlng);
+      })
+      .catch(() => {
+        toast.error("Não foi possível obter sua localização");
+        setIsTracking(false);
+        localStorage.setItem("isTracking", "false");
+      });
+  };
+
+  // App nativo: pedir permissão ao montar; buscar posição se rastreamento estava ativo
+  useEffect(() => {
+    if (isNative) {
+      requestLocationPermission();
+      const savedTrackingState = localStorage.getItem("isTracking");
+      if (savedTrackingState === "true") {
+        setIsTracking(true);
+        fetchAndShowLocation();
+      }
+    }
+  }, [isNative]);
+
+  // Web: usar locate do Leaflet
+  useEffect(() => {
+    if (!isNative) {
+      map.locate({ enableHighAccuracy: true, setView: false });
+    }
+  }, [map, isNative]);
+
+  useEffect(() => {
+    if (!isNative) {
+      const savedTrackingState = localStorage.getItem("isTracking");
+      if (savedTrackingState === "true") {
+        setIsTracking(true);
+        map.locate({ enableHighAccuracy: true, setView: false });
+      }
+    }
+  }, [map, isNative]);
+
+  useMapEvents(
+    isNative
+      ? {}
+      : {
+          locationfound: (e: { latlng: any; accuracy: number }) => {
+            createLocationMarker(e.latlng, e.accuracy);
+          },
+          locationerror: () => {
+            toast.error("Não foi possível obter sua localização");
+            setIsTracking(false);
+            localStorage.setItem("isTracking", "false");
+          },
+        }
+  );
 
   const toggleLocation = () => {
     if (!isTracking) {
-      map.locate({ enableHighAccuracy: true, setView: false });
-      toast.success("Rastreando sua localização");
+      if (isNative) {
+        requestLocationPermission();
+        fetchAndShowLocation();
+        toast.success("Rastreando sua localização");
+      } else {
+        map.locate({ enableHighAccuracy: true, setView: false });
+        toast.success("Rastreando sua localização");
+      }
     } else {
-      map.stopLocate();
+      if (!isNative) map.stopLocate();
       removeLocationMarker();
       toast.info("Parou de rastrear localização");
     }

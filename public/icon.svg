@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Corpo do ônibus (primary - teal) -->
+  <path d="M8 22v20c0 1.1.9 2 2 2h2v4h4v-4h28v4h4v-4h2c1.1 0 2-.9 2-2V22c0-2.2-1.8-4-4-4H12c-2.2 0-4 1.8-4 4Z" fill="#1a9e8c"/>
+  <!-- Faixa inferior (secondary - âmbar) -->
+  <path d="M8 38h48v4H8z" fill="#f59e0b"/>
+  <!-- Janelas -->
+  <rect x="14" y="24" width="8" height="10" rx="1" fill="#fff" fill-opacity=".9"/>
+  <rect x="26" y="24" width="8" height="10" rx="1" fill="#fff" fill-opacity=".9"/>
+  <rect x="38" y="24" width="8" height="10" rx="1" fill="#fff" fill-opacity=".9"/>
+  <!-- Roda dianteira -->
+  <circle cx="16" cy="44" r="4" fill="#0d5c52" stroke="#fff" stroke-width="1"/>
+  <!-- Roda traseira -->
+  <circle cx="48" cy="44" r="4" fill="#0d5c52" stroke="#fff" stroke-width="1"/>
+  <!-- Farol / detalhe frontal -->
+  <path d="M56 28h4v8h-4z" fill="#f59e0b"/>
+</svg>

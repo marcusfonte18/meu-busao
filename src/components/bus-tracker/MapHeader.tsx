@@ -1,6 +1,6 @@
 "use client";
 
-import { Bus, MapPin, X } from "lucide-react";
+import { Bus, MapPin, Star, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { getLineHex } from "@/lib/line-colors";
@@ -12,6 +12,8 @@ interface MapHeaderProps {
   onClear: () => void;
   onChangeLine: () => void;
   onRemoveLine?: (linha: string) => void;
+  favoritos?: string[];
+  onToggleFavorito?: (numero: string) => void;
 }
 
 export function MapHeader({
@@ -20,6 +22,8 @@ export function MapHeader({
   onClear,
   onChangeLine,
   onRemoveLine,
+  favoritos = [],
+  onToggleFavorito,
 }: MapHeaderProps) {
   const canRemoveIndividual = lineNumbers.length > 1 && onRemoveLine;
   const hasOnibus = lineNumbers.some((l) => getLineType(l) === "onibus");
@@ -53,18 +57,33 @@ export function MapHeader({
               </span>
               {lineNumbers.map((linha) => {
                 const isBrt = getLineType(linha) === "brt";
+                const isFav = favoritos.includes(linha);
                 return (
                 <span
                   key={linha}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold text-white",
-                    canRemoveIndividual && "pr-1"
+                    "inline-flex items-center gap-0.5 rounded-lg px-2 py-0.5 text-[10px] font-bold text-white",
+                    (canRemoveIndividual || onToggleFavorito) && "pr-0.5"
                   )}
                   style={{
                     backgroundColor: isBrt ? "hsl(var(--secondary))" : getLineHex(linha),
                   }}
                 >
                   {linha}
+                  {onToggleFavorito && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onToggleFavorito(linha);
+                      }}
+                      className="rounded p-0.5 hover:bg-white/20 transition-colors"
+                      aria-label={isFav ? `Remover linha ${linha} dos favoritos` : `Favoritar linha ${linha}`}
+                    >
+                      <Star className={cn("h-3 w-3", isFav && "fill-current")} />
+                    </button>
+                  )}
                   {canRemoveIndividual && (
                     <button
                       type="button"

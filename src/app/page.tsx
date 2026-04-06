@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 
+import { getCurrentPosition } from "@/lib/geolocation";
 import { resetRegistry } from "@/lib/line-colors";
 import { InitialSearch } from "./InitialSearch";
 import { BusMap } from "./BusMap";
@@ -11,6 +12,7 @@ import type { TransportMode } from "./types";
 
 const STORAGE_KEY = "meu-busao-linhas";
 const STORAGE_MODE_KEY = "meu-busao-mode";
+const STORAGE_FAVORITOS_KEY = "meu-busao-favoritos";
 const DEFAULT_CENTER = { lat: -22.9068, lng: -43.1729 } as const;
 
 function loadSavedLinhas(): string[] {
@@ -41,9 +43,27 @@ function saveMode(mode: TransportMode) {
   localStorage.setItem(STORAGE_MODE_KEY, mode);
 }
 
+function loadSavedFavoritos(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_FAVORITOS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((l) => typeof l === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFavoritos(favoritos: string[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_FAVORITOS_KEY, JSON.stringify(favoritos));
+}
+
 export default function HomePage() {
   const [selectedLine, setSelectedLine] = useState<Array<string>>([]);
   const [transportMode, setTransportMode] = useState<TransportMode>("onibus");
+  const [favoritos, setFavoritos] = useState<Array<string>>([]);
   const [hasHydrated, setHasHydrated] = useState(false);
   const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [busInfo, setBusInfo] = useState<{
@@ -58,17 +78,17 @@ export default function HomePage() {
   useEffect(() => {
     setSelectedLine(loadSavedLinhas());
     setTransportMode(loadSavedMode());
+    setFavoritos(loadSavedFavoritos());
     setHasHydrated(true);
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        setInitialCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 120000, timeout: 15000 }
-    );
+    if (typeof window === "undefined") return;
+    getCurrentPosition({ maximumAge: 120000, timeout: 15000 })
+      .then(({ latitude, longitude }) =>
+        setInitialCenter({ lat: latitude, lng: longitude })
+      )
+      .catch(() => {});
   }, []);
 
   const handleSearch = (linhas: string[], mode: TransportMode) => {
@@ -85,6 +105,16 @@ export default function HomePage() {
     toast.error("Todas as linhas foram removidas");
   };
 
+  const handleToggleFavorito = (numero: string) => {
+    setFavoritos((prev) => {
+      const next = prev.includes(numero)
+        ? prev.filter((l) => l !== numero)
+        : [...prev, numero];
+      saveFavoritos(next);
+      return next;
+    });
+  };
+
   return (
     <>
       <Toaster position="top-center" richColors theme="light" />
@@ -95,7 +125,12 @@ export default function HomePage() {
       ) : selectedLine.length === 0 ? (
         <>
           <div className="flex min-h-[100dvh] flex-col pb-14">
-            <InitialSearch mode="onibus" onSearch={handleSearch} />
+            <InitialSearch
+              mode="onibus"
+              onSearch={handleSearch}
+              favoritos={favoritos}
+              onToggleFavorito={handleToggleFavorito}
+            />
           </div>
           <BottomNav active="buscar" />
         </>
@@ -117,6 +152,8 @@ export default function HomePage() {
         onBusInfoChange={setBusInfo}
         selectedLinha={selectedLine}
         initialCenter={initialCenter ?? DEFAULT_CENTER}
+        favoritos={favoritos}
+        onToggleFavorito={handleToggleFavorito}
       />
       <BottomNav
         active="mapa"

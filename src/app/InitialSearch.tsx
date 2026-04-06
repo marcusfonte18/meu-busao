@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Plus, X, Search, Sparkles, TrendingUp, Clock, MapPin, Bus, Train } from "lucide-react";
+import { Plus, X, Search, Sparkles, Star, TrendingUp, Clock, MapPin, Bus, Train } from "lucide-react";
+import { getCurrentPosition } from "@/lib/geolocation";
 import { cn, getApiBase } from "@/lib/utils";
 import { getLineType, type TransportMode } from "./types";
 
@@ -11,9 +12,13 @@ type LineSuggestion = { numero: string; nome: string };
 export const InitialSearch = ({
   mode: initialMode,
   onSearch,
+  favoritos = [],
+  onToggleFavorito,
 }: {
   mode: TransportMode;
   onSearch: (linhas: string[], mode: TransportMode) => void;
+  favoritos?: string[];
+  onToggleFavorito?: (numero: string) => void;
 }) => {
   const [linhaInput, setLinhaInput] = useState("");
   const [linhas, setLinhas] = useState<string[]>([]);
@@ -47,30 +52,18 @@ export const InitialSearch = ({
   }, []);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setUserLocationLabel("Rio de Janeiro");
-      setLocationLoading(false);
-      return;
-    }
     setLocationLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
+    getCurrentPosition({ timeout: 10000, maximumAge: 300000 })
+      .then(async ({ latitude, longitude }) => {
         try {
           const base = getApiBase();
           const res = await fetch(
             `${base}/api/reverse-geocode?lat=${latitude}&lon=${longitude}`
-
           );
-
           const data = await res.json();
-
-          console.log('data', data);
-
           const addr = data?.address;
           if (!addr) {
             setUserLocationLabel("Rio de Janeiro");
-            setLocationLoading(false);
             return;
           }
           const suburb = addr.suburb || addr.neighbourhood || addr.quarter;
@@ -86,14 +79,9 @@ export const InitialSearch = ({
         } catch {
           setUserLocationLabel("Rio de Janeiro");
         }
-        setLocationLoading(false);
-      },
-      () => {
-        setUserLocationLabel("Rio de Janeiro");
-        setLocationLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-    );
+      })
+      .catch(() => setUserLocationLabel("Rio de Janeiro"))
+      .finally(() => setLocationLoading(false));
   }, []);
 
   const modoParam = "onibus,brt";
@@ -384,6 +372,18 @@ export const InitialSearch = ({
                           Estimativa em breve
                         </span>
                       </div>
+                      {onToggleFavorito && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleFavorito(linha)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                          aria-label={favoritos.includes(linha) ? `Remover linha ${linha} dos favoritos` : `Favoritar linha ${linha}`}
+                        >
+                          <Star
+                            className={cn("h-4 w-4", favoritos.includes(linha) && "fill-primary text-primary")}
+                          />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleRemoveLinha(linha)}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
@@ -412,6 +412,61 @@ export const InitialSearch = ({
           >
             <span>▶</span>Iniciar Monitoramento
           </button>
+
+          {/* Favoritos */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Star className="h-4 w-4 text-primary" />
+              <span>Favoritos</span>
+            </div>
+            {favoritos.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhuma linha favoritada. Toque na estrela ao adicionar linhas.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {favoritos.map((numero) => {
+                  const isBrt = getLineType(numero) === "brt";
+                  const nome = linhasNomes[numero];
+                  const display = nome ? `${numero} – ${nome}` : `Linha ${numero}`;
+                  return (
+                    <div
+                      key={numero}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200",
+                        isBrt
+                          ? "bg-secondary text-secondary-foreground"
+                          : "bg-primary text-primary-foreground"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleAddPopular({ numero, nome: nome ?? `Linha ${numero}` })}
+                        className="flex flex-1 items-center gap-2 text-left min-w-0"
+                        aria-label={`Adicionar linha ${numero} ao monitoramento`}
+                      >
+                        <span className="font-bold shrink-0">{numero}</span>
+                        <span className="opacity-90 truncate">{nome ?? `Linha ${numero}`}</span>
+                      </button>
+                      {onToggleFavorito && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFavorito(numero);
+                          }}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+                          aria-label={`Remover linha ${numero} dos favoritos`}
+                        >
+                          <Star className="h-3.5 w-3.5 fill-current" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Linhas populares: toque para adicionar à lista */}
           <div className="flex flex-col gap-3">
