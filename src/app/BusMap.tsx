@@ -21,7 +21,10 @@ import dynamic from "next/dynamic";
 
 /** Converte nome da linha (ex: "Pavuna - Passeio") em labels dos sentidos. */
 function parseDirectionLabels(nome: string): { ida: string; volta: string } {
-  const parts = nome.split(/\s*[-–/]\s*/).map((p) => p.trim()).filter(Boolean);
+  const parts = nome
+    .split(/\s*[-–/]\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   if (parts.length >= 2) {
     return {
       ida: `${parts[0]} → ${parts[1]}`,
@@ -33,12 +36,12 @@ function parseDirectionLabels(nome: string): { ida: string; volta: string } {
 
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
+  { ssr: false },
 );
 
 const TileLayer = dynamic(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
+  { ssr: false },
 );
 
 const LoadingState = ({ selectedLinha }: { selectedLinha: string[] }) => {
@@ -69,7 +72,10 @@ function MapFooter() {
       <Link href="/termos" className="transition-colors hover:text-foreground">
         Termos
       </Link>
-      <Link href="/privacidade" className="transition-colors hover:text-foreground">
+      <Link
+        href="/privacidade"
+        className="transition-colors hover:text-foreground"
+      >
         Privacidade
       </Link>
     </footer>
@@ -92,14 +98,16 @@ export const BusMap = ({
   onClearSelectedLinha: () => void;
   onRemoveLine?: (linha: string) => void;
   onTrocarLinhas?: () => void;
-  onBusInfoChange?: (info: {
-    lineNumber: string;
-    destination: string;
-    speed: number;
-    heading: number;
-    headingLabel: string;
-    lastUpdate: string;
-  } | null) => void;
+  onBusInfoChange?: (
+    info: {
+      lineNumber: string;
+      destination: string;
+      speed: number;
+      heading: number;
+      headingLabel: string;
+      lastUpdate: string;
+    } | null,
+  ) => void;
   initialCenter?: [number, number] | { lat: number; lng: number };
   favoritos?: string[];
   onToggleFavorito?: (numero: string) => void;
@@ -113,10 +121,9 @@ export const BusMap = ({
   const [lineDirectionLabels, setLineDirectionLabels] = useState<
     Record<string, { ida: string; volta: string }>
   >({});
-  const center: [number, number] =
-    Array.isArray(initialCenter)
-      ? initialCenter
-      : [initialCenter.lat, initialCenter.lng];
+  const center: [number, number] = Array.isArray(initialCenter)
+    ? initialCenter
+    : [initialCenter.lat, initialCenter.lng];
 
   useEffect(() => {
     if (selectedLinha.length === 0) {
@@ -155,7 +162,9 @@ export const BusMap = ({
       selectedLinha.map((numero) => {
         const modo = getLineType(numero);
         // Vários resultados: "38" não pode virar só a 1ª linha (ex.: 138 antes de 38).
-        return fetch(`${base}/api/lines?q=${encodeURIComponent(numero)}&modo=${modo}&limit=30`)
+        return fetch(
+          `${base}/api/lines?q=${encodeURIComponent(numero)}&modo=${modo}&limit=30`,
+        )
           .then((res) => (res.ok ? res.json() : { lines: [] }))
           .then((data: { lines: { numero: string; nome: string }[] }) => {
             const line =
@@ -163,7 +172,7 @@ export const BusMap = ({
             if (line?.nome) acc[numero] = parseDirectionLabels(line.nome);
             else acc[numero] = { ida: "Ida", volta: "Volta" };
           });
-      })
+      }),
     ).then(() => setLineDirectionLabels(acc));
   }, [selectedLinha.join(",")]);
 
@@ -189,13 +198,21 @@ export const BusMap = ({
     }
     const heading = bus.heading ?? 0;
     const headingLabel =
-      heading >= 337.5 || heading < 22.5 ? "Norte" :
-      heading >= 22.5 && heading < 67.5 ? "Nordeste" :
-      heading >= 67.5 && heading < 112.5 ? "Leste" :
-      heading >= 112.5 && heading < 157.5 ? "Sudeste" :
-      heading >= 157.5 && heading < 202.5 ? "Sul" :
-      heading >= 202.5 && heading < 247.5 ? "Sudoeste" :
-      heading >= 247.5 && heading < 292.5 ? "Oeste" : "Noroeste";
+      heading >= 337.5 || heading < 22.5
+        ? "Norte"
+        : heading >= 22.5 && heading < 67.5
+          ? "Nordeste"
+          : heading >= 67.5 && heading < 112.5
+            ? "Leste"
+            : heading >= 112.5 && heading < 157.5
+              ? "Sudeste"
+              : heading >= 157.5 && heading < 202.5
+                ? "Sul"
+                : heading >= 202.5 && heading < 247.5
+                  ? "Sudoeste"
+                  : heading >= 247.5 && heading < 292.5
+                    ? "Oeste"
+                    : "Noroeste";
 
     onBusInfoChange?.({
       lineNumber: bus.linha,
@@ -227,18 +244,17 @@ export const BusMap = ({
         />
         {/* Sentido por linha: mesmo formato com uma ou várias linhas (terminais reais nos botões). */}
         <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/30 px-4 py-2">
-          <span className="text-xs font-medium text-muted-foreground">Sentido</span>
           {selectedLinha.map((numero) => {
             const labels = lineDirectionLabels[numero];
-            const dirs = selectedDirectionsByLine[numero] ?? { ida: true, volta: true };
+            const dirs = selectedDirectionsByLine[numero] ?? {
+              ida: true,
+              volta: true,
+            };
             const { bg, text } = getLineColor(numero);
             const idaLabel = labels?.ida ?? "Ida";
             const voltaLabel = labels?.volta ?? "Volta";
             return (
-              <div
-                key={numero}
-                className="flex flex-wrap items-center gap-2"
-              >
+              <div key={numero} className="flex flex-wrap items-center gap-2">
                 {selectedLinha.length > 1 && (
                   <span
                     className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${bg} ${text}`}
@@ -268,7 +284,10 @@ export const BusMap = ({
                   onClick={() =>
                     setSelectedDirectionsByLine((prev) => {
                       const cur = prev[numero] ?? { ida: true, volta: true };
-                      return { ...prev, [numero]: { ...cur, volta: !cur.volta } };
+                      return {
+                        ...prev,
+                        [numero]: { ...cur, volta: !cur.volta },
+                      };
                     })
                   }
                   className={`max-w-[min(100%,18rem)] truncate rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -309,26 +328,28 @@ export const BusMap = ({
               />
             </MapContainer>
           </div>
-          {selectedBusId && buses && (() => {
-            const bus = buses.find((b) => b.id === selectedBusId);
-            if (!bus) return null;
-            const heading = bus.heading ?? 0;
-            const speed = Math.round(Number(bus.velocidade) || 0);
-            return (
-              <div className="absolute bottom-16 left-0 right-0 z-20 flex justify-center px-4">
-                <BusInfoPanel
-                  lineNumber={bus.linha}
-                  destination={`Linha ${bus.linha}`}
-                  mode={mode}
-                  speed={speed}
-                  heading={heading}
-                  lastUpdate={formatLastUpdate(bus.timestamp)}
-                  onClose={() => setSelectedBusId(null)}
-                  selectedLinhas={selectedLinha}
-                />
-              </div>
-            );
-          })()}
+          {selectedBusId &&
+            buses &&
+            (() => {
+              const bus = buses.find((b) => b.id === selectedBusId);
+              if (!bus) return null;
+              const heading = bus.heading ?? 0;
+              const speed = Math.round(Number(bus.velocidade) || 0);
+              return (
+                <div className="absolute bottom-16 left-0 right-0 z-20 flex justify-center px-4">
+                  <BusInfoPanel
+                    lineNumber={bus.linha}
+                    destination={`Linha ${bus.linha}`}
+                    mode={mode}
+                    speed={speed}
+                    heading={heading}
+                    lastUpdate={formatLastUpdate(bus.timestamp)}
+                    onClose={() => setSelectedBusId(null)}
+                    selectedLinhas={selectedLinha}
+                  />
+                </div>
+              );
+            })()}
         </CardContent>
       </Card>
       <MapFooter />

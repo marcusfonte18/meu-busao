@@ -1,8 +1,13 @@
 "use client";
 
 import { Clock, Navigation, Bus, X } from "lucide-react";
+import { getLineColor } from "@/lib/line-colors";
 import { cn } from "@/lib/utils";
-import { getLineColorsForPanel } from "./bus-marker";
+
+function lineColorsForPanel(lineNumber: string) {
+  const c = getLineColor(lineNumber);
+  return { bg: c.bg, text: c.text, iconColor: c.iconColor };
+}
 
 interface BusInfoPanelProps {
   lineNumber: string;
@@ -27,7 +32,7 @@ export function BusInfoPanel({
 }: BusInfoPanelProps) {
   const colors =
     mode === "onibus" && selectedLinhas.length > 0
-      ? getLineColorsForPanel(lineNumber)
+      ? lineColorsForPanel(lineNumber)
       : mode === "onibus"
         ? { bg: "bg-primary", text: "text-primary-foreground", iconColor: "hsl(174,72%,40%)" }
         : { bg: "bg-secondary", text: "text-secondary-foreground", iconColor: "hsl(38,92%,50%)" };

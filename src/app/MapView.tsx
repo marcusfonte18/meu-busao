@@ -441,10 +441,7 @@ export function formatLastUpdate(timestamp: string): string {
   }
 }
 
-export type DirectionFilter = "all" | "ida" | "volta";
-
-/** Sentidos selecionados: ida e/ou volta. Ambos true = mostrar os dois. */
-export type SelectedDirections = { ida: boolean; volta: boolean };
+type SelectedDirections = { ida: boolean; volta: boolean };
 
 /** Filtro de sentido por número de linha (independente entre linhas). */
 export type SelectedDirectionsByLine = Record<string, SelectedDirections>;
@@ -596,45 +593,6 @@ export const BusMarkers = ({
       }
     }
   }, [selectedBus, buses, map]);
-
-  const calculateStats = (busId: string) => {
-    const history = busHistory[busId] || [];
-    if (history.length === 0) return { avgSpeed: 0, distance: 0 };
-
-    // Calcula a velocidade média usando apenas valores válidos
-    const validSpeeds = history
-      .map((record) => record.speed)
-      .filter((speed) => !isNaN(speed) && speed >= 0 && speed < 150); // Filtra velocidades absurdas
-
-    const avgSpeed =
-      validSpeeds.length > 0
-        ? validSpeeds.reduce((sum, speed) => sum + speed, 0) /
-          validSpeeds.length
-        : 0;
-
-    // Calcula a distância apenas se houver pelo menos dois pontos
-    let distance = 0;
-    if (history.length >= 2) {
-      for (let i = 1; i < history.length; i++) {
-        const prev = history[i - 1].position;
-        const curr = history[i].position;
-
-        // Verifica se as coordenadas são válidas
-        if (prev[0] && prev[1] && curr[0] && curr[1]) {
-          const segmentDistance = map.distance(prev, curr);
-          // Adiciona apenas se a distância for razoável (menos de 1km entre pontos)
-          if (segmentDistance < 1000) {
-            distance += segmentDistance;
-          }
-        }
-      }
-    }
-
-    return {
-      avgSpeed: Math.round(avgSpeed * 10) / 10, // Arredonda para uma casa decimal
-      distance: Math.round((distance / 1000) * 10) / 10, // Converte para km e arredonda
-    };
-  };
 
   const getHeadingForBus = (busId: string): number | undefined => {
     const history = busHistory[busId] || [];

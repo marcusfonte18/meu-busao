@@ -4,7 +4,7 @@
  * Colors are assigned by index order (first line added = first color, etc.)
  */
 
-export interface LineColorSet {
+interface LineColorSet {
   hsl: string;
   bg: string;
   text: string;
@@ -50,7 +50,7 @@ const COLOR_SETS: LineColorSet[] = PALETTE.map((p) => buildColorSet(p.hsl));
  */
 const lineRegistry = new Map<string, number>();
 
-export function registerLine(lineNumber: string): void {
+function registerLine(lineNumber: string): void {
   if (!lineRegistry.has(lineNumber)) {
     lineRegistry.set(lineNumber, lineRegistry.size % COLOR_SETS.length);
   }
@@ -71,15 +71,6 @@ export function getLineHex(lineNumber: string): string {
   return getLineColor(lineNumber).hsl;
 }
 
-export function getAllRegisteredLines(): { number: string; color: LineColorSet }[] {
-  return Array.from(lineRegistry.entries()).map(([num, idx]) => ({
-    number: num,
-    color: COLOR_SETS[idx],
-  }));
-}
-
 export function resetRegistry(): void {
   lineRegistry.clear();
 }
-
-export { PALETTE, COLOR_SETS };

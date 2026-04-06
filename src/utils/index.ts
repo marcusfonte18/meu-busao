@@ -30,17 +30,3 @@ export function parseCoordinate(value: string): number {
   const parsed = parseFloat(value.replace(",", "."));
   return isNaN(parsed) ? 0 : parsed;
 }
-
-export const getColorForLine = (line: string) => {
-  let hash = 0;
-  for (let i = 0; i < line.length; i++) {
-    hash = (hash * 31 + line.charCodeAt(i)) & 0xffffffff; // Hash melhor distribuído
-  }
-
-  // Transformamos o hash em um valor dentro de 0-360 para matiz (H)
-  const hue = Math.abs(hash % 360); // Cores variadas
-  const saturation = 70; // Saturação fixa (deixar alto para cores vibrantes)
-  const lightness = 50; // Luminosidade fixa (para evitar cores muito escuras)
-
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-};
