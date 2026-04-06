@@ -10,11 +10,11 @@ import {
   formatLastUpdate,
   type RouteShapesMap,
   type RouteStopsMap,
-  type SelectedDirections,
+  type SelectedDirectionsByLine,
 } from "./MapView";
 import { BusInfoPanel } from "@/components/bus-tracker/BusInfoPanel";
 import { MapHeader } from "@/components/bus-tracker/MapHeader";
-import { registerLines } from "@/lib/line-colors";
+import { getLineColor, registerLines } from "@/lib/line-colors";
 import { getApiBase } from "@/lib/utils";
 import { getLineType, type TransportMode } from "./types";
 import dynamic from "next/dynamic";
@@ -108,10 +108,8 @@ export const BusMap = ({
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
   const [routeStops, setRouteStops] = useState<RouteStopsMap>({});
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
-  const [selectedDirections, setSelectedDirections] = useState<SelectedDirections>({
-    ida: true,
-    volta: true,
-  });
+  const [selectedDirectionsByLine, setSelectedDirectionsByLine] =
+    useState<SelectedDirectionsByLine>({});
   const [lineDirectionLabels, setLineDirectionLabels] = useState<
     Record<string, { ida: string; volta: string }>
   >({});
@@ -156,15 +154,27 @@ export const BusMap = ({
     Promise.all(
       selectedLinha.map((numero) => {
         const modo = getLineType(numero);
-        return fetch(`${base}/api/lines?q=${encodeURIComponent(numero)}&modo=${modo}&limit=1`)
+        // Vários resultados: "38" não pode virar só a 1ª linha (ex.: 138 antes de 38).
+        return fetch(`${base}/api/lines?q=${encodeURIComponent(numero)}&modo=${modo}&limit=30`)
           .then((res) => (res.ok ? res.json() : { lines: [] }))
           .then((data: { lines: { numero: string; nome: string }[] }) => {
-            const line = data.lines?.[0];
+            const line =
+              data.lines?.find((l) => l.numero === numero) ?? data.lines?.[0];
             if (line?.nome) acc[numero] = parseDirectionLabels(line.nome);
             else acc[numero] = { ida: "Ida", volta: "Volta" };
           });
       })
     ).then(() => setLineDirectionLabels(acc));
+  }, [selectedLinha.join(",")]);
+
+  useEffect(() => {
+    setSelectedDirectionsByLine((prev) => {
+      const next: SelectedDirectionsByLine = {};
+      for (const n of selectedLinha) {
+        next[n] = prev[n] ?? { ida: true, volta: true };
+      }
+      return next;
+    });
   }, [selectedLinha.join(",")]);
 
   useEffect(() => {
@@ -215,37 +225,64 @@ export const BusMap = ({
           favoritos={favoritos}
           onToggleFavorito={onToggleFavorito}
         />
-        {/* Filtro de sentido: ambos selecionados por padrão; clique para alternar */}
+        {/* Sentido por linha: mesmo formato com uma ou várias linhas (terminais reais nos botões). */}
         <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/30 px-4 py-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground shrink-0">Sentido:</span>
-            <button
-              onClick={() =>
-                setSelectedDirections((prev) => ({ ...prev, ida: !prev.ida }))
-              }
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                selectedDirections.ida
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
-              }`}
-            >
-              Ida
-            </button>
-            <button
-              onClick={() =>
-                setSelectedDirections((prev) => ({ ...prev, volta: !prev.volta }))
-              }
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                selectedDirections.volta
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
-              }`}
-            >
-              Volta
-            </button>
-            <span className="text-[10px] text-muted-foreground">(aplica a todas as linhas)</span>
-          </div>
-        
+          <span className="text-xs font-medium text-muted-foreground">Sentido</span>
+          {selectedLinha.map((numero) => {
+            const labels = lineDirectionLabels[numero];
+            const dirs = selectedDirectionsByLine[numero] ?? { ida: true, volta: true };
+            const { bg, text } = getLineColor(numero);
+            const idaLabel = labels?.ida ?? "Ida";
+            const voltaLabel = labels?.volta ?? "Volta";
+            return (
+              <div
+                key={numero}
+                className="flex flex-wrap items-center gap-2"
+              >
+                {selectedLinha.length > 1 && (
+                  <span
+                    className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${bg} ${text}`}
+                  >
+                    {numero}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedDirectionsByLine((prev) => {
+                      const cur = prev[numero] ?? { ida: true, volta: true };
+                      return { ...prev, [numero]: { ...cur, ida: !cur.ida } };
+                    })
+                  }
+                  className={`max-w-[min(100%,18rem)] truncate rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    dirs.ida
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  }`}
+                  title={idaLabel}
+                >
+                  {idaLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedDirectionsByLine((prev) => {
+                      const cur = prev[numero] ?? { ida: true, volta: true };
+                      return { ...prev, [numero]: { ...cur, volta: !cur.volta } };
+                    })
+                  }
+                  className={`max-w-[min(100%,18rem)] truncate rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    dirs.volta
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  }`}
+                  title={voltaLabel}
+                >
+                  {voltaLabel}
+                </button>
+              </div>
+            );
+          })}
         </div>
         <CardContent className="relative min-h-0 flex-1 p-0">
           <div className="h-full w-full overflow-hidden rounded-b-none md:rounded-b-lg">
@@ -267,7 +304,7 @@ export const BusMap = ({
                 mode={mode}
                 selectedBus={selectedBusId}
                 onSelectBus={setSelectedBusId}
-                selectedDirections={selectedDirections}
+                selectedDirectionsByLine={selectedDirectionsByLine}
                 selectedLinhas={selectedLinha}
               />
             </MapContainer>

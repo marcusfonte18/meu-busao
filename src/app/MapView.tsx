@@ -446,6 +446,9 @@ export type DirectionFilter = "all" | "ida" | "volta";
 /** Sentidos selecionados: ida e/ou volta. Ambos true = mostrar os dois. */
 export type SelectedDirections = { ida: boolean; volta: boolean };
 
+/** Filtro de sentido por número de linha (independente entre linhas). */
+export type SelectedDirectionsByLine = Record<string, SelectedDirections>;
+
 export type RouteStopsMap = Record<string, [number, number][]>;
 
 export const BusMarkers = ({
@@ -455,7 +458,7 @@ export const BusMarkers = ({
   mode = "onibus",
   selectedBus,
   onSelectBus,
-  selectedDirections = { ida: true, volta: true },
+  selectedDirectionsByLine = {},
   selectedLinhas = [],
 }: {
   buses: BusData[];
@@ -464,9 +467,12 @@ export const BusMarkers = ({
   mode?: TransportMode;
   selectedBus: string | null;
   onSelectBus: (id: string | null) => void;
-  selectedDirections?: SelectedDirections;
+  selectedDirectionsByLine?: SelectedDirectionsByLine;
   selectedLinhas?: string[];
 }) => {
+  const getDirsForLine = (linha: string): SelectedDirections =>
+    selectedDirectionsByLine[linha] ?? { ida: true, volta: true };
+
   // Linhas cuja ordem poly0/poly1 é invertida em relação à primeira linha (normaliza sentido geográfico)
   const polyOrderSwapped = React.useMemo(() => {
     const firstLine = selectedLinhas[0] ?? Object.keys(routeShapes)[0];
@@ -646,15 +652,16 @@ export const BusMarkers = ({
       polylines,
       bus.heading ?? getHeadingForBus(bus.id)
     );
+    const dirs = getDirsForLine(bus.linha);
     // Sem route shapes ou sentido indefinido: mostrar se pelo menos um sentido estiver selecionado
     if (sentido === null) {
-      return selectedDirections.ida || selectedDirections.volta;
+      return dirs.ida || dirs.volta;
     }
     // Normaliza por linha: se poly0 desta linha aponta direção oposta à primeira, inverte ida/volta
     if (polyOrderSwapped[bus.linha]) {
       sentido = sentido === "ida" ? "volta" : "ida";
     }
-    return sentido === "ida" ? selectedDirections.ida : selectedDirections.volta;
+    return sentido === "ida" ? dirs.ida : dirs.volta;
   });
 
   return (
@@ -667,10 +674,11 @@ export const BusMarkers = ({
             ? getLineHex(linha)
             : SECONDARY_COLOR;
         const swapped = polyOrderSwapped[linha];
+        const dirs = getDirsForLine(linha);
         return polylines.slice(0, 2).flatMap((positions, idx) => {
           // idx 0 = poly0, idx 1 = poly1. Se swapped, poly0=volta geo e poly1=ida geo.
           const geoIsIda = (idx === 0 && !swapped) || (idx === 1 && swapped);
-          const isSelected = geoIsIda ? selectedDirections.ida : selectedDirections.volta;
+          const isSelected = geoIsIda ? dirs.ida : dirs.volta;
           if (!isSelected) return [];
           const lineKey = `route-${linha}-${idx}`;
           return [
@@ -703,6 +711,7 @@ export const BusMarkers = ({
         const poly0 = polylines?.[0];
         const poly1 = polylines?.[1];
         const swapped = polyOrderSwapped[linha];
+        const dirs = getDirsForLine(linha);
         const hasDirection = poly0 && poly0.length >= 2 && poly1 && poly1.length >= 2;
         const lineColor = getLineType(linha) === "brt" ? SECONDARY_COLOR : getLineHex(linha);
         return positions.map(([lat, lng], idx) => {
@@ -711,13 +720,13 @@ export const BusMarkers = ({
             const dist0 = minDistSqToPolyline(lat, lng, poly0);
             const dist1 = minDistSqToPolyline(lat, lng, poly1);
             const geoIsIda = dist0 <= dist1 ? !swapped : swapped;
-            const isSelected = geoIsIda ? selectedDirections.ida : selectedDirections.volta;
+            const isSelected = geoIsIda ? dirs.ida : dirs.volta;
             if (!isSelected) return null;
             const poly = dist0 <= dist1 ? poly0 : poly1;
             const onLine = getClosestPointOnPolyline(lat, lng, poly);
             if (onLine) center = onLine;
           } else {
-            if (!selectedDirections.ida && !selectedDirections.volta) return null;
+            if (!dirs.ida && !dirs.volta) return null;
           }
           return (
             <CircleMarker
