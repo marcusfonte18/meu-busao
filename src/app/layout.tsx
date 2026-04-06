@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "./QueryProvider";
+import { ServiceWorkerRegister } from "./ServiceWorkerRegister";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
@@ -11,6 +12,12 @@ export const metadata: Metadata = {
   description: "Monitore linhas de ônibus e BRT em tempo real no Rio de Janeiro",
   icons: {
     icon: "/favicon/favicon.svg",
+    apple: "/favicon/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "BusTracker Rio",
+    statusBarStyle: "default",
   },
   manifest: "/favicon/site.webmanifest",
   openGraph: {
@@ -40,7 +47,10 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased bg-background text-foreground`}>
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <ServiceWorkerRegister />
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );
