@@ -92,12 +92,20 @@ export function MapLibreView({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    if (typeof window !== "undefined") {
+      maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+    }
+
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: DEFAULT_STYLE,
       center: centerLngLat,
       zoom: initialZoom,
       attributionControl: {},
+    });
+
+    map.on("error", (e) => {
+      console.warn("MapLibre GL:", e);
     });
 
     map.addControl(
@@ -108,8 +116,16 @@ export function MapLibreView({
       "top-right"
     );
 
+    const ro = new ResizeObserver(() => {
+      map.resize();
+    });
+    if (containerRef.current) {
+      ro.observe(containerRef.current);
+    }
+
     map.on("load", () => {
       isLoadedRef.current = true;
+      map.resize();
 
       // 1. Source e Layers de Rotas (traçados)
       if (!map.getSource("route-shapes")) {
@@ -141,7 +157,7 @@ export function MapLibreView({
             "line-join": "round",
           },
           paint: {
-            "line-color": ["get", "color"],
+            "line-color": ["coalesce", ["get", "color"], "#10b981"],
             "line-width": 3.5,
             "line-opacity": 0.9,
           },
@@ -172,7 +188,7 @@ export function MapLibreView({
               4.5,
             ],
             "circle-color": "#ffffff",
-            "circle-stroke-color": ["get", "color"],
+            "circle-stroke-color": ["coalesce", ["get", "color"], "#10b981"],
             "circle-stroke-width": 2,
             "circle-opacity": [
               "interpolate",
@@ -211,10 +227,10 @@ export function MapLibreView({
           filter: ["==", ["get", "isSelected"], 1],
           paint: {
             "circle-radius": 24,
-            "circle-color": ["get", "color"],
+            "circle-color": ["coalesce", ["get", "color"], "#10b981"],
             "circle-opacity": 0.35,
             "circle-stroke-width": 2,
-            "circle-stroke-color": ["get", "color"],
+            "circle-stroke-color": ["coalesce", ["get", "color"], "#10b981"],
             "circle-stroke-opacity": 0.7,
           },
         });
@@ -231,7 +247,7 @@ export function MapLibreView({
               18,
               15,
             ],
-            "circle-color": ["get", "color"],
+            "circle-color": ["coalesce", ["get", "color"], "#10b981"],
             "circle-stroke-color": "#ffffff",
             "circle-stroke-width": 2.5,
           },
@@ -244,20 +260,21 @@ export function MapLibreView({
           source: "vehicles",
           layout: {
             "text-field": "▲",
+            "text-font": ["Noto Sans Regular"],
             "text-size": [
               "case",
               ["==", ["get", "isSelected"], 1],
               12,
               10,
             ],
-            "text-rotate": ["get", "heading"],
+            "text-rotate": ["coalesce", ["get", "heading"], 0],
             "text-rotation-alignment": "map",
             "text-offset": [0, -1.5],
             "text-allow-overlap": true,
             "text-ignore-placement": true,
           },
           paint: {
-            "text-color": ["get", "color"],
+            "text-color": ["coalesce", ["get", "color"], "#10b981"],
             "text-halo-color": "#ffffff",
             "text-halo-width": 1.5,
           },
@@ -269,7 +286,8 @@ export function MapLibreView({
           type: "symbol",
           source: "vehicles",
           layout: {
-            "text-field": ["get", "linha"],
+            "text-field": ["to-string", ["coalesce", ["get", "linha"], ""]],
+            "text-font": ["Noto Sans Bold"],
             "text-size": [
               "case",
               ["==", ["get", "isSelected"], 1],
@@ -295,7 +313,8 @@ export function MapLibreView({
             [">", ["get", "speed"], 0],
           ],
           layout: {
-            "text-field": ["get", "speedLabel"],
+            "text-field": ["to-string", ["coalesce", ["get", "speedLabel"], ""]],
+            "text-font": ["Noto Sans Regular"],
             "text-size": 10,
             "text-offset": [0, -2.6],
             "text-allow-overlap": true,
@@ -331,6 +350,7 @@ export function MapLibreView({
     mapRef.current = map;
 
     return () => {
+      ro.disconnect();
       isLoadedRef.current = false;
       if (userMarkerRef.current) {
         userMarkerRef.current.remove();

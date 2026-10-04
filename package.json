@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node -e \"const fs = require('fs'); fs.mkdirSync('public/maplibre', {recursive: true}); ['maplibre-gl-worker.mjs', 'maplibre-gl-worker.mjs.map', 'maplibre-gl-shared.mjs', 'maplibre-gl-shared.mjs.map'].forEach(f => fs.copyFileSync('node_modules/maplibre-gl/dist/' + f, 'public/maplibre/' + f));\"",
     "dev": "next dev --turbopack",
     "build": "next build",
     "build:app": "./scripts/build-app.sh",
