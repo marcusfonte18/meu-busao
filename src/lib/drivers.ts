@@ -273,3 +273,148 @@ export function routeStopsToGeoJson(
   };
 }
 
+/** Modelo comum normalizado para veículos (Ônibus e BRT). */
+export interface Vehicle {
+  id: string;
+  ordem: string;
+  linha: string;
+  latitude: number;
+  longitude: number;
+  velocidade: number;
+  timestamp: string;
+  heading?: number;
+  type: TransportMode;
+}
+
+/** Converte BusData no modelo comum Vehicle */
+export function toVehicle(bus: BusData): Vehicle {
+  return {
+    ...bus,
+    velocidade: Number(bus.velocidade) || 0,
+    type: getLineType(bus.linha),
+  };
+}
+
+/**
+ * Estima se o ônibus está em sentido ida (polyline 0) ou volta (polyline 1)
+ * usando posição e, se existir, heading. Retorna null se não der para definir.
+ */
+export function estimateBusSentido(
+  bus: BusData,
+  polylines: [number, number][][] | undefined,
+  headingDeg: number | undefined
+): "ida" | "volta" | null {
+  if (!polylines || polylines.length < 2) return null;
+  const [poly0, poly1] = polylines;
+  if (poly0.length < 2 || poly1.length < 2) return null;
+
+  const bearing0 = getClosestSegmentBearing(poly0, bus.latitude, bus.longitude);
+  const bearing1 = getClosestSegmentBearing(poly1, bus.latitude, bus.longitude);
+  if (bearing0 == null || bearing1 == null) return null;
+
+  if (headingDeg != null && !Number.isNaN(headingDeg)) {
+    const diff0 = angleDiff(headingDeg, bearing0);
+    const diff1 = angleDiff(headingDeg, bearing1);
+    return diff0 <= diff1 ? "ida" : "volta";
+  }
+
+  const dist0 = minDistSqToPolyline(bus.latitude, bus.longitude, poly0);
+  const dist1 = minDistSqToPolyline(bus.latitude, bus.longitude, poly1);
+  return dist0 <= dist1 ? "ida" : "volta";
+}
+
+export interface BusHistoryItem {
+  position: [number, number];
+  timestamp: Date;
+  speed: number;
+}
+export type BusHistoryMap = Record<string, BusHistoryItem[]>;
+
+/** Calcula o heading a partir das duas últimas posições do histórico do ônibus */
+export function getHeadingFromHistory(
+  busHistory: BusHistoryMap,
+  busId: string
+): number | undefined {
+  const history = busHistory[busId] || [];
+  if (history.length < 2) return undefined;
+  const [prev, curr] = [
+    history[history.length - 2],
+    history[history.length - 1],
+  ];
+  return getBearing(
+    prev.position[0],
+    prev.position[1],
+    curr.position[0],
+    curr.position[1]
+  );
+}
+
+/**
+ * Converte lista de veículos (buses) em GeoJSON FeatureCollection de Points
+ * aplicando filtros de sentido (ida/volta) e definindo propriedades para a renderização.
+ */
+export function busesToGeoJson(
+  buses: BusData[],
+  routeShapes: RouteShapesMap = {},
+  polyOrderSwapped: Record<string, boolean> = {},
+  selectedDirectionsByLine: SelectedDirectionsByLine = {},
+  selectedBusId: string | null = null,
+  busHistory: BusHistoryMap = {}
+): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
+
+  for (const bus of buses) {
+    const polylines = routeShapes[bus.linha];
+    const heading =
+      bus.heading ?? getHeadingFromHistory(busHistory, bus.id) ?? 0;
+    let sentido = estimateBusSentido(bus, polylines, heading);
+    const dirs = selectedDirectionsByLine[bus.linha] ?? {
+      ida: true,
+      volta: true,
+    };
+
+    if (sentido !== null) {
+      if (polyOrderSwapped[bus.linha]) {
+        sentido = sentido === "ida" ? "volta" : "ida";
+      }
+      const isVisible = sentido === "ida" ? dirs.ida : dirs.volta;
+      if (!isVisible) continue;
+    } else {
+      if (!dirs.ida && !dirs.volta) continue;
+    }
+
+    const isBrt = getLineType(bus.linha) === "brt";
+    const lineColor = isBrt ? SECONDARY_COLOR : getLineHex(bus.linha);
+    const isSelected = selectedBusId === bus.id;
+    const speed = Math.round(Number(bus.velocidade) || 0);
+
+    features.push({
+      type: "Feature",
+      id: bus.id,
+      properties: {
+        id: bus.id,
+        ordem: bus.ordem,
+        linha: bus.linha,
+        velocidade: speed,
+        speed,
+        speedLabel: `${speed} km/h`,
+        heading,
+        color: lineColor,
+        isSelected: isSelected ? 1 : 0,
+        timestamp: bus.timestamp,
+      },
+      geometry: {
+        type: "Point",
+        // Inversão para GeoJSON: [lng, lat]
+        coordinates: [bus.longitude, bus.latitude],
+      },
+    });
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  };
+}
+
+

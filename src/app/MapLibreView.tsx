@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { Locate } from "lucide-react";
+import { toast } from "sonner";
+import {
+  getCurrentPosition,
+  isNativePlatform,
+  requestLocationPermission,
+} from "@/lib/geolocation";
+import { cn } from "@/lib/utils";
 
 interface MapLibreViewProps {
   initialCenter?: [number, number] | { lat: number; lng: number };
@@ -10,6 +18,9 @@ interface MapLibreViewProps {
   className?: string;
   routesGeoJson?: GeoJSON.FeatureCollection<GeoJSON.LineString>;
   stopsGeoJson?: GeoJSON.FeatureCollection<GeoJSON.Point>;
+  vehiclesGeoJson?: GeoJSON.FeatureCollection<GeoJSON.Point>;
+  selectedBusId?: string | null;
+  onSelectBus?: (id: string | null) => void;
   onMapLoaded?: (map: maplibregl.Map) => void;
 }
 
@@ -22,11 +33,17 @@ export function MapLibreView({
   className = "h-full w-full",
   routesGeoJson,
   stopsGeoJson,
+  vehiclesGeoJson,
+  selectedBusId = null,
+  onSelectBus,
   onMapLoaded,
 }: MapLibreViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const isLoadedRef = useRef(false);
+  const userMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
+  const isNative = isNativePlatform();
 
   // Normaliza o centro para [lng, lat] (MapLibre usa [longitude, latitude])
   const centerLngLat: [number, number] = React.useMemo(() => {
@@ -34,7 +51,11 @@ export function MapLibreView({
       if (Math.abs(initialCenter[0]) <= 90 && Math.abs(initialCenter[1]) > 90) {
         return [initialCenter[1], initialCenter[0]];
       }
-      if (initialCenter[0] > -30 && initialCenter[0] < -20 && initialCenter[1] < -40) {
+      if (
+        initialCenter[0] > -30 &&
+        initialCenter[0] < -20 &&
+        initialCenter[1] < -40
+      ) {
         return [initialCenter[1], initialCenter[0]];
       }
       return initialCenter;
@@ -42,6 +63,32 @@ export function MapLibreView({
     return [initialCenter.lng, initialCenter.lat];
   }, [initialCenter]);
 
+  // Wake Lock para manter tela acesa no mobile
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    let sentinel: { release: () => Promise<void> } | null = null;
+
+    const requestWakeLock = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        sentinel = await (navigator as any).wakeLock.request("screen");
+      } catch {
+        // Ignora caso recusado pelo navegador
+      }
+    };
+
+    requestWakeLock();
+    const handleVis = () => {
+      if (document.visibilityState === "visible") requestWakeLock();
+    };
+    document.addEventListener("visibilitychange", handleVis);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVis);
+      sentinel?.release?.().catch(() => {});
+    };
+  }, []);
+
+  // Inicialização do Mapa
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -64,7 +111,7 @@ export function MapLibreView({
     map.on("load", () => {
       isLoadedRef.current = true;
 
-      // Adiciona source e layers de traçados de rotas caso já existam dados
+      // 1. Source e Layers de Rotas (traçados)
       if (!map.getSource("route-shapes")) {
         map.addSource("route-shapes", {
           type: "geojson",
@@ -101,7 +148,7 @@ export function MapLibreView({
         });
       }
 
-      // Adiciona source e layer de paradas (stops)
+      // 2. Source e Layer de Paradas (Stops)
       if (!map.getSource("route-stops")) {
         map.addSource("route-stops", {
           type: "geojson",
@@ -149,6 +196,135 @@ export function MapLibreView({
         });
       }
 
+      // 3. Source e Layers de Veículos (Buses / BRT)
+      if (!map.getSource("vehicles")) {
+        map.addSource("vehicles", {
+          type: "geojson",
+          data: vehiclesGeoJson || { type: "FeatureCollection", features: [] },
+        });
+
+        // Halo de destaque para o ônibus selecionado
+        map.addLayer({
+          id: "vehicles-selected-halo",
+          type: "circle",
+          source: "vehicles",
+          filter: ["==", ["get", "isSelected"], 1],
+          paint: {
+            "circle-radius": 24,
+            "circle-color": ["get", "color"],
+            "circle-opacity": 0.35,
+            "circle-stroke-width": 2,
+            "circle-stroke-color": ["get", "color"],
+            "circle-stroke-opacity": 0.7,
+          },
+        });
+
+        // Círculo principal do ônibus
+        map.addLayer({
+          id: "vehicles-circle",
+          type: "circle",
+          source: "vehicles",
+          paint: {
+            "circle-radius": [
+              "case",
+              ["==", ["get", "isSelected"], 1],
+              18,
+              15,
+            ],
+            "circle-color": ["get", "color"],
+            "circle-stroke-color": "#ffffff",
+            "circle-stroke-width": 2.5,
+          },
+        });
+
+        // Indicador de direção (triângulo apontando para o heading)
+        map.addLayer({
+          id: "vehicles-direction",
+          type: "symbol",
+          source: "vehicles",
+          layout: {
+            "text-field": "▲",
+            "text-size": [
+              "case",
+              ["==", ["get", "isSelected"], 1],
+              12,
+              10,
+            ],
+            "text-rotate": ["get", "heading"],
+            "text-rotation-alignment": "map",
+            "text-offset": [0, -1.5],
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
+          },
+          paint: {
+            "text-color": ["get", "color"],
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 1.5,
+          },
+        });
+
+        // Número da linha no centro do círculo
+        map.addLayer({
+          id: "vehicles-label",
+          type: "symbol",
+          source: "vehicles",
+          layout: {
+            "text-field": ["get", "linha"],
+            "text-size": [
+              "case",
+              ["==", ["get", "isSelected"], 1],
+              12,
+              10,
+            ],
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
+          },
+          paint: {
+            "text-color": "#ffffff",
+          },
+        });
+
+        // Badge de velocidade acima do veículo quando selecionado
+        map.addLayer({
+          id: "vehicles-speed",
+          type: "symbol",
+          source: "vehicles",
+          filter: [
+            "all",
+            ["==", ["get", "isSelected"], 1],
+            [">", ["get", "speed"], 0],
+          ],
+          layout: {
+            "text-field": ["get", "speedLabel"],
+            "text-size": 10,
+            "text-offset": [0, -2.6],
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
+          },
+          paint: {
+            "text-color": "#ffffff",
+            "text-halo-color": "rgba(0,0,0,0.85)",
+            "text-halo-width": 4,
+          },
+        });
+      }
+
+      // Eventos de clique e hover no veículo
+      map.on("click", "vehicles-circle", (e) => {
+        const feature = e.features?.[0];
+        if (feature?.properties?.id) {
+          onSelectBus?.(feature.properties.id);
+        }
+      });
+
+      map.on("mouseenter", "vehicles-circle", () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+
+      map.on("mouseleave", "vehicles-circle", () => {
+        map.getCanvas().style.cursor = "";
+      });
+
       onMapLoaded?.(map);
     });
 
@@ -156,6 +332,10 @@ export function MapLibreView({
 
     return () => {
       isLoadedRef.current = false;
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove();
+        userMarkerRef.current = null;
+      }
       map.remove();
       mapRef.current = null;
     };
@@ -165,34 +345,140 @@ export function MapLibreView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isLoadedRef.current) return;
-
-    const source = map.getSource("route-shapes") as maplibregl.GeoJSONSource | undefined;
+    const source = map.getSource("route-shapes") as
+      | maplibregl.GeoJSONSource
+      | undefined;
     const data = routesGeoJson || { type: "FeatureCollection", features: [] };
-
-    if (source) {
-      source.setData(data);
-    }
+    if (source) source.setData(data);
   }, [routesGeoJson]);
 
   // Atualização das paradas das linhas (RouteStops)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isLoadedRef.current) return;
-
-    const source = map.getSource("route-stops") as maplibregl.GeoJSONSource | undefined;
+    const source = map.getSource("route-stops") as
+      | maplibregl.GeoJSONSource
+      | undefined;
     const data = stopsGeoJson || { type: "FeatureCollection", features: [] };
-
-    if (source) {
-      source.setData(data);
-    }
+    if (source) source.setData(data);
   }, [stopsGeoJson]);
+
+  // Atualização dos veículos (Buses / BRT)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoadedRef.current) return;
+    const source = map.getSource("vehicles") as
+      | maplibregl.GeoJSONSource
+      | undefined;
+    const data = vehiclesGeoJson || { type: "FeatureCollection", features: [] };
+    if (source) source.setData(data);
+  }, [vehiclesGeoJson]);
+
+  // Seguir / centralizar no ônibus selecionado
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedBusId || !vehiclesGeoJson) return;
+
+    const feature = vehiclesGeoJson.features.find(
+      (f) => f.properties?.id === selectedBusId
+    );
+    if (feature && feature.geometry.type === "Point") {
+      const [lng, lat] = feature.geometry.coordinates;
+      map.easeTo({
+        center: [lng, lat],
+        zoom: Math.max(map.getZoom(), 15),
+        duration: 500,
+      });
+    }
+  }, [selectedBusId, vehiclesGeoJson]);
+
+  // Geolocalização do Usuário
+  const updateLocationMarker = useCallback(
+    (lng: number, lat: number) => {
+      const map = mapRef.current;
+      if (!map) return;
+
+      if (!userMarkerRef.current) {
+        const el = document.createElement("div");
+        el.className = "relative w-6 h-6";
+        el.innerHTML = `
+          <div class="absolute inset-0 bg-blue-500 rounded-full opacity-25 animate-ping"></div>
+          <div class="absolute inset-[20%] bg-blue-500 rounded-full border-2 border-white shadow-md"></div>
+        `;
+        userMarkerRef.current = new maplibregl.Marker({ element: el })
+          .setLngLat([lng, lat])
+          .addTo(map);
+      } else {
+        userMarkerRef.current.setLngLat([lng, lat]);
+      }
+    },
+    []
+  );
+
+  const fetchAndShowLocation = useCallback(() => {
+    getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 })
+      .then(({ latitude, longitude }) => {
+        updateLocationMarker(longitude, latitude);
+        const map = mapRef.current;
+        if (map) {
+          map.easeTo({
+            center: [longitude, latitude],
+            zoom: Math.max(map.getZoom(), 14),
+            duration: 800,
+          });
+        }
+      })
+      .catch(() => {
+        toast.error("Não foi possível obter sua localização");
+        setIsTracking(false);
+        localStorage.setItem("isTracking", "false");
+      });
+  }, [updateLocationMarker]);
+
+  const toggleLocation = () => {
+    if (!isTracking) {
+      if (isNative) requestLocationPermission();
+      fetchAndShowLocation();
+      toast.success("Rastreando sua localização");
+      setIsTracking(true);
+      localStorage.setItem("isTracking", "true");
+    } else {
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove();
+        userMarkerRef.current = null;
+      }
+      toast.info("Parou de rastrear localização");
+      setIsTracking(false);
+      localStorage.setItem("isTracking", "false");
+    }
+  };
 
   return (
     <div
-      ref={containerRef}
       className={className}
       style={{ position: "relative", width: "100%", height: "100%" }}
-    />
+    >
+      <div
+        ref={containerRef}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+      />
+      {/* Botão de Localização do Usuário */}
+      <div className="absolute right-3 top-14 z-10">
+        <button
+          type="button"
+          onClick={toggleLocation}
+          className={cn(
+            "flex h-10 w-10 items-center justify-center rounded-xl shadow-md transition-colors",
+            isTracking
+              ? "bg-primary text-primary-foreground shadow-primary/25 hover:bg-primary/90"
+              : "bg-card text-muted-foreground hover:bg-card/90 hover:text-foreground"
+          )}
+          title={isTracking ? "Parar de rastrear" : "Rastrear localização"}
+        >
+          <Locate className="h-5 w-5" />
+        </button>
+      </div>
+    </div>
   );
 }
 
