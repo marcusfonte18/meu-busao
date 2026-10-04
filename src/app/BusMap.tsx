@@ -1,23 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useBusData } from "./useBusData";
 import { Loader2 } from "lucide-react";
 import {
-  BusMarkers,
-  formatLastUpdate,
   type RouteShapesMap,
   type RouteStopsMap,
   type SelectedDirectionsByLine,
-} from "./MapView";
+  type BusHistoryMap,
+  formatLastUpdate,
+  calculatePolyOrderSwapped,
+  routeShapesToGeoJson,
+  routeStopsToGeoJson,
+  busesToGeoJson,
+} from "@/lib/drivers";
+import { MapLibreView } from "./MapLibreView";
 import { BusInfoPanel } from "@/components/bus-tracker/BusInfoPanel";
 import { MapHeader } from "@/components/bus-tracker/MapHeader";
 import { getLineColor, registerLines } from "@/lib/line-colors";
 import { getApiBase } from "@/lib/utils";
 import { getLineType, type TransportMode } from "./types";
-import dynamic from "next/dynamic";
 
 /** Converte nome da linha (ex: "Pavuna - Passeio") em labels dos sentidos. */
 function parseDirectionLabels(nome: string): { ida: string; volta: string } {
@@ -33,16 +37,6 @@ function parseDirectionLabels(nome: string): { ida: string; volta: string } {
   }
   return { ida: "Ida", volta: "Volta" };
 }
-
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false },
-);
-
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false },
-);
 
 const LoadingState = ({ selectedLinha }: { selectedLinha: string[] }) => {
   const hasOnibus = selectedLinha.some((l) => getLineType(l) === "onibus");
@@ -115,6 +109,7 @@ export const BusMap = ({
   const { data: buses, isLoading } = useBusData(selectedLinha);
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
   const [routeStops, setRouteStops] = useState<RouteStopsMap>({});
+  const [busHistory, setBusHistory] = useState<BusHistoryMap>({});
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const [selectedDirectionsByLine, setSelectedDirectionsByLine] =
     useState<SelectedDirectionsByLine>({});
@@ -124,6 +119,27 @@ export const BusMap = ({
   const center: [number, number] = Array.isArray(initialCenter)
     ? initialCenter
     : [initialCenter.lat, initialCenter.lng];
+
+  // Histórico de posições para cálculo do heading quando não fornecido pela API
+  useEffect(() => {
+    if (!buses || buses.length === 0) return;
+    setBusHistory((prev) => {
+      const next = { ...prev };
+      for (const bus of buses) {
+        if (!next[bus.id]) next[bus.id] = [];
+        const maxRecords = 30;
+        next[bus.id] = [
+          ...next[bus.id].slice(-maxRecords),
+          {
+            position: [bus.latitude, bus.longitude],
+            timestamp: new Date(),
+            speed: Number(bus.velocidade) || 0,
+          },
+        ];
+      }
+      return next;
+    });
+  }, [buses]);
 
   useEffect(() => {
     if (selectedLinha.length === 0) {
@@ -161,7 +177,6 @@ export const BusMap = ({
     Promise.all(
       selectedLinha.map((numero) => {
         const modo = getLineType(numero);
-        // Vários resultados: "38" não pode virar só a 1ª linha (ex.: 138 antes de 38).
         return fetch(
           `${base}/api/lines?q=${encodeURIComponent(numero)}&modo=${modo}&limit=30`,
         )
@@ -186,6 +201,7 @@ export const BusMap = ({
     });
   }, [selectedLinha.join(",")]);
 
+  // Painel de informações do ônibus selecionado
   useEffect(() => {
     if (!selectedBusId || !buses) {
       onBusInfoChange?.(null);
@@ -224,6 +240,53 @@ export const BusMap = ({
     });
   }, [selectedBusId, buses, onBusInfoChange]);
 
+  // GeoJSON dos dados para o MapLibre
+  const polyOrderSwapped = useMemo(
+    () => calculatePolyOrderSwapped(routeShapes, selectedLinha),
+    [routeShapes, selectedLinha],
+  );
+
+  const routesGeoJson = useMemo(
+    () =>
+      routeShapesToGeoJson(
+        routeShapes,
+        polyOrderSwapped,
+        selectedDirectionsByLine,
+      ),
+    [routeShapes, polyOrderSwapped, selectedDirectionsByLine],
+  );
+
+  const stopsGeoJson = useMemo(
+    () =>
+      routeStopsToGeoJson(
+        routeStops,
+        routeShapes,
+        polyOrderSwapped,
+        selectedDirectionsByLine,
+      ),
+    [routeStops, routeShapes, polyOrderSwapped, selectedDirectionsByLine],
+  );
+
+  const vehiclesGeoJson = useMemo(
+    () =>
+      busesToGeoJson(
+        buses || [],
+        routeShapes,
+        polyOrderSwapped,
+        selectedDirectionsByLine,
+        selectedBusId,
+        busHistory,
+      ),
+    [
+      buses,
+      routeShapes,
+      polyOrderSwapped,
+      selectedDirectionsByLine,
+      selectedBusId,
+      busHistory,
+    ],
+  );
+
   if (isLoading || !buses || buses.length === 0) {
     return <LoadingState selectedLinha={selectedLinha} />;
   }
@@ -242,7 +305,7 @@ export const BusMap = ({
           favoritos={favoritos}
           onToggleFavorito={onToggleFavorito}
         />
-        {/* Sentido por linha: mesmo formato com uma ou várias linhas (terminais reais nos botões). */}
+        {/* Sentido por linha: mesmo formato com uma ou várias linhas */}
         <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/30 px-4 py-2">
           {selectedLinha.map((numero) => {
             const labels = lineDirectionLabels[numero];
@@ -305,28 +368,15 @@ export const BusMap = ({
         </div>
         <CardContent className="relative min-h-0 flex-1 p-0">
           <div className="h-full w-full overflow-hidden rounded-b-none md:rounded-b-lg">
-            <MapContainer
-              center={center}
-              zoom={13}
-              style={{ height: "100%", width: "100%" }}
-              className="z-0"
-              zoomControl={false}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-              <BusMarkers
-                buses={buses}
-                routeShapes={routeShapes}
-                routeStops={routeStops}
-                mode={mode}
-                selectedBus={selectedBusId}
-                onSelectBus={setSelectedBusId}
-                selectedDirectionsByLine={selectedDirectionsByLine}
-                selectedLinhas={selectedLinha}
-              />
-            </MapContainer>
+            <MapLibreView
+              initialCenter={center}
+              initialZoom={13}
+              routesGeoJson={routesGeoJson}
+              stopsGeoJson={stopsGeoJson}
+              vehiclesGeoJson={vehiclesGeoJson}
+              selectedBusId={selectedBusId}
+              onSelectBus={setSelectedBusId}
+            />
           </div>
           {selectedBusId &&
             buses &&

@@ -417,4 +417,22 @@ export function busesToGeoJson(
   };
 }
 
+/** Formata a data/hora da última atualização para exibição amigável */
+export function formatLastUpdate(timestamp: string): string {
+  try {
+    const d = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "agora";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} min atrás`;
+    const diffH = Math.floor(diffMin / 60);
+    return `${diffH}h atrás`;
+  } catch {
+    return "—";
+  }
+}
+
+
 
