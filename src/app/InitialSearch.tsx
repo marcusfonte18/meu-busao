@@ -2,7 +2,18 @@
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Plus, X, Search, Sparkles, Star, TrendingUp, Clock, MapPin, Bus, Train } from "lucide-react";
+import {
+  Plus,
+  X,
+  Search,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Clock,
+  MapPin,
+  Bus,
+  Train,
+} from "lucide-react";
 import { getCurrentPosition } from "@/lib/geolocation";
 import { cn, getApiBase } from "@/lib/utils";
 import { getLineType, type TransportMode } from "./types";
@@ -26,9 +37,13 @@ export const InitialSearch = ({
   const [suggestions, setSuggestions] = useState<LineSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  const [userLocationLabel, setUserLocationLabel] = useState<string | null>(null);
+  const [userLocationLabel, setUserLocationLabel] = useState<string | null>(
+    null,
+  );
   const [locationLoading, setLocationLoading] = useState(true);
-  const [popularLines, setPopularLines] = useState<{ numero: string; nome: string | null }[]>([]);
+  const [popularLines, setPopularLines] = useState<
+    { numero: string; nome: string | null }[]
+  >([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -58,7 +73,7 @@ export const InitialSearch = ({
         try {
           const base = getApiBase();
           const res = await fetch(
-            `${base}/api/reverse-geocode?lat=${latitude}&lon=${longitude}`
+            `${base}/api/reverse-geocode?lat=${latitude}&lon=${longitude}`,
           );
           const data = await res.json();
           const addr = data?.address;
@@ -67,7 +82,8 @@ export const InitialSearch = ({
             return;
           }
           const suburb = addr.suburb || addr.neighbourhood || addr.quarter;
-          const city = addr.city || addr.town || addr.municipality || addr.state;
+          const city =
+            addr.city || addr.town || addr.municipality || addr.state;
           const state = addr.state;
           if (suburb && city) {
             setUserLocationLabel(`${suburb}, ${city}`);
@@ -102,7 +118,7 @@ export const InitialSearch = ({
       try {
         const base = getApiBase();
         const res = await fetch(
-          `${base}/api/lines?q=${encodeURIComponent(q)}&modo=${modoParam}&limit=20`
+          `${base}/api/lines?q=${encodeURIComponent(q)}&modo=${modoParam}&limit=20`,
         );
         const data = await res.json().catch(() => ({ lines: [] }));
         const list = data.lines || [];
@@ -123,7 +139,10 @@ export const InitialSearch = ({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
         setShowSuggestions(false);
       }
     }
@@ -174,7 +193,9 @@ export const InitialSearch = ({
       return updated;
     });
     toast.error(
-      next.length === 0 ? "Todas as linhas foram removidas" : `Linha ${linha} removida`
+      next.length === 0
+        ? "Todas as linhas foram removidas"
+        : `Linha ${linha} removida`,
     );
   };
 
@@ -196,7 +217,6 @@ export const InitialSearch = ({
     nome: l.nome ?? `Linha ${l.numero}`,
   }));
 
-
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <div className="mx-auto w-full max-w-md">
@@ -205,7 +225,9 @@ export const InitialSearch = ({
           <div className="flex max-w-[70%] items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate" title={userLocationLabel ?? undefined}>
-              {locationLoading ? "Buscando localização..." : (userLocationLabel ?? "Rio de Janeiro")}
+              {locationLoading
+                ? "Buscando localização..."
+                : (userLocationLabel ?? "Rio de Janeiro")}
             </span>
           </div>
         </header>
@@ -228,28 +250,48 @@ export const InitialSearch = ({
               <div
                 className={cn(
                   "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold",
-                  "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                  "bg-primary text-primary-foreground shadow-lg shadow-primary/25",
                 )}
               >
                 <Bus className="h-4 w-4" />
                 <span>Ônibus</span>
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-foreground/20 text-[10px] font-bold">
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  <svg
+                    className="h-3 w-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </span>
               </div>
               <div
                 className={cn(
                   "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold",
-                  "bg-secondary text-secondary-foreground shadow-lg shadow-secondary/25"
+                  "bg-secondary text-secondary-foreground shadow-lg shadow-secondary/25",
                 )}
               >
                 <Train className="h-4 w-4" />
                 <span>BRT</span>
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary-foreground/20 text-[10px] font-bold">
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  <svg
+                    className="h-3 w-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </span>
               </div>
@@ -273,51 +315,41 @@ export const InitialSearch = ({
                 className="w-full rounded-xl border border-border bg-card py-3.5 pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               />
               {showSuggestions && linhaInput.trim().length >= minChars && (
-                  <ul
-                    className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-card py-1 shadow-lg max-h-56 overflow-auto"
-                    role="listbox"
-                  >
-                    {loadingSuggestions ? (
-                      <li className="px-4 py-3 text-sm text-muted-foreground">
-                        Buscando...
+                <ul
+                  className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-card py-1 shadow-lg max-h-56 overflow-auto"
+                  role="listbox"
+                >
+                  {loadingSuggestions ? (
+                    <li className="px-4 py-3 text-sm text-muted-foreground">
+                      Buscando...
+                    </li>
+                  ) : suggestions.length > 0 ? (
+                    suggestions.map((s) => (
+                      <li
+                        key={s.numero}
+                        role="option"
+                        className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSuggestionClick(s);
+                        }}
+                      >
+                        <span className="font-semibold">{s.numero}</span>
+                        {s.nome && (
+                          <span className="truncate text-muted-foreground">
+                            {s.nome}
+                          </span>
+                        )}
                       </li>
-                    ) : suggestions.length > 0 ? (
-                      suggestions.map((s) => (
-                        <li
-                          key={s.numero}
-                          role="option"
-                          className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleSuggestionClick(s);
-                          }}
-                        >
-                          <span className="font-semibold">{s.numero}</span>
-                          {s.nome && (
-                            <span className="truncate text-muted-foreground">
-                              {s.nome}
-                            </span>
-                          )}
-                        </li>
-                      ))
-                    ) : (
-                      <li className="px-4 py-3 text-sm text-muted-foreground">
-                        Nenhuma linha encontrada
-                      </li>
-                    )}
-                  </ul>
-                )}
+                    ))
+                  ) : (
+                    <li className="px-4 py-3 text-sm text-muted-foreground">
+                      Nenhuma linha encontrada
+                    </li>
+                  )}
+                </ul>
+              )}
             </div>
-
-            {/* Add Button */}
-            {/* <button
-              type="button"
-              onClick={() => handleAddLinha()}
-              className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card/50 py-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-[0.98]"
-            >
-              <Plus className="h-4 w-4" />
-              Adicionar
-            </button> */}
           </div>
 
           {/* Selected Lines */}
@@ -350,7 +382,7 @@ export const InitialSearch = ({
                         "flex items-center gap-3 rounded-xl border p-3 transition-all duration-200 hover:shadow-md",
                         lineType === "onibus"
                           ? "border-primary/20 bg-primary/5"
-                          : "border-secondary/20 bg-secondary/5"
+                          : "border-secondary/20 bg-secondary/5",
                       )}
                     >
                       <div
@@ -358,7 +390,7 @@ export const InitialSearch = ({
                           "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
                           lineType === "onibus"
                             ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-secondary-foreground"
+                            : "bg-secondary text-secondary-foreground",
                         )}
                       >
                         {linha}
@@ -377,10 +409,18 @@ export const InitialSearch = ({
                           type="button"
                           onClick={() => onToggleFavorito(linha)}
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                          aria-label={favoritos.includes(linha) ? `Remover linha ${linha} dos favoritos` : `Favoritar linha ${linha}`}
+                          aria-label={
+                            favoritos.includes(linha)
+                              ? `Remover linha ${linha} dos favoritos`
+                              : `Favoritar linha ${linha}`
+                          }
                         >
                           <Star
-                            className={cn("h-4 w-4", favoritos.includes(linha) && "fill-primary text-primary")}
+                            className={cn(
+                              "h-4 w-4",
+                              favoritos.includes(linha) &&
+                                "fill-primary text-primary",
+                            )}
                           />
                         </button>
                       )}
@@ -407,7 +447,7 @@ export const InitialSearch = ({
               "flex items-center justify-center gap-2 rounded-xl py-4 text-sm font-bold transition-all duration-300 active:scale-[0.98]",
               linhas.length === 0
                 ? "cursor-not-allowed bg-muted text-muted-foreground"
-                : "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
+                : "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30",
             )}
           >
             <span>▶</span>Iniciar Monitoramento
@@ -428,7 +468,9 @@ export const InitialSearch = ({
                 {favoritos.map((numero) => {
                   const isBrt = getLineType(numero) === "brt";
                   const nome = linhasNomes[numero];
-                  const display = nome ? `${numero} – ${nome}` : `Linha ${numero}`;
+                  const display = nome
+                    ? `${numero} – ${nome}`
+                    : `Linha ${numero}`;
                   return (
                     <div
                       key={numero}
@@ -436,17 +478,24 @@ export const InitialSearch = ({
                         "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200",
                         isBrt
                           ? "bg-secondary text-secondary-foreground"
-                          : "bg-primary text-primary-foreground"
+                          : "bg-primary text-primary-foreground",
                       )}
                     >
                       <button
                         type="button"
-                        onClick={() => handleAddPopular({ numero, nome: nome ?? `Linha ${numero}` })}
+                        onClick={() =>
+                          handleAddPopular({
+                            numero,
+                            nome: nome ?? `Linha ${numero}`,
+                          })
+                        }
                         className="flex flex-1 items-center gap-2 text-left min-w-0"
                         aria-label={`Adicionar linha ${numero} ao monitoramento`}
                       >
                         <span className="font-bold shrink-0">{numero}</span>
-                        <span className="opacity-90 truncate">{nome ?? `Linha ${numero}`}</span>
+                        <span className="opacity-90 truncate">
+                          {nome ?? `Linha ${numero}`}
+                        </span>
                       </button>
                       {onToggleFavorito && (
                         <button
@@ -494,7 +543,7 @@ export const InitialSearch = ({
                       alreadyAdded && [
                         "ring-2 ring-offset-2 ring-offset-background",
                         isBrt ? "ring-secondary" : "ring-primary",
-                      ]
+                      ],
                     )}
                     aria-label={`Adicionar linha ${line.numero} ${line.nome}`}
                   >
