@@ -5,15 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/** Base URL da API: vazio na web (mesma origem) ou URL absoluta no app. Garante protocolo para não virar path relativo. */
+/** Base URL da API: vazio na web (mesma origem) ou URL absoluta no app nativo (Capacitor). */
 export function getApiBase(): string {
-  const url = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL) || ""
-  // Em localhost (dev) usar sempre mesma origem para evitar CORS
+  // Na web, usar sempre a mesma origem (relativo) para evitar erros de CORS e certificado
   if (typeof window !== "undefined") {
-    const o = window.location.origin
-    if (o.startsWith("http://localhost") || o.startsWith("http://127.0.0.1")) return ""
+    const isCapacitor = Boolean(
+      (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })?.Capacitor?.isNativePlatform?.()
+    );
+    if (!isCapacitor) return "";
   }
-  if (!url) return ""
-  if (/^https?:\/\//i.test(url)) return url.replace(/\/+$/, "")
-  return `https://${url.replace(/^\/+/, "")}`
+
+  const url = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL) || "";
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url.replace(/\/+$/, "");
+  return `https://${url.replace(/^\/+/, "")}`;
 }

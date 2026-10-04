@@ -3,7 +3,7 @@
  * PWA service worker: API e HTML sempre na rede; cache só para assets versionados
  * (_next/static) e outros recursos estáticos, para não servir posições de ônibus antigas.
  */
-const STATIC_CACHE = "meu-busao-static-v1";
+const STATIC_CACHE = "meu-busao-static-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
