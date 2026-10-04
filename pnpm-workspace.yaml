@@ -1,3 +1,6 @@
+packages:
+  - "."
+
 patchedDependencies:
   '@capacitor/android': patches/@capacitor__android.patch
   '@capacitor/geolocation': patches/@capacitor__geolocation.patch
