@@ -9,6 +9,7 @@ interface MapLibreViewProps {
   initialZoom?: number;
   className?: string;
   routesGeoJson?: GeoJSON.FeatureCollection<GeoJSON.LineString>;
+  stopsGeoJson?: GeoJSON.FeatureCollection<GeoJSON.Point>;
   onMapLoaded?: (map: maplibregl.Map) => void;
 }
 
@@ -20,6 +21,7 @@ export function MapLibreView({
   initialZoom = 13,
   className = "h-full w-full",
   routesGeoJson,
+  stopsGeoJson,
   onMapLoaded,
 }: MapLibreViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -99,6 +101,54 @@ export function MapLibreView({
         });
       }
 
+      // Adiciona source e layer de paradas (stops)
+      if (!map.getSource("route-stops")) {
+        map.addSource("route-stops", {
+          type: "geojson",
+          data: stopsGeoJson || { type: "FeatureCollection", features: [] },
+        });
+
+        map.addLayer({
+          id: "route-stops-circles",
+          type: "circle",
+          source: "route-stops",
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12,
+              1.5,
+              14,
+              3,
+              16,
+              4.5,
+            ],
+            "circle-color": "#ffffff",
+            "circle-stroke-color": ["get", "color"],
+            "circle-stroke-width": 2,
+            "circle-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              11.5,
+              0,
+              12.5,
+              1,
+            ],
+            "circle-stroke-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              11.5,
+              0,
+              12.5,
+              1,
+            ],
+          },
+        });
+      }
+
       onMapLoaded?.(map);
     });
 
@@ -123,6 +173,19 @@ export function MapLibreView({
       source.setData(data);
     }
   }, [routesGeoJson]);
+
+  // Atualização das paradas das linhas (RouteStops)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoadedRef.current) return;
+
+    const source = map.getSource("route-stops") as maplibregl.GeoJSONSource | undefined;
+    const data = stopsGeoJson || { type: "FeatureCollection", features: [] };
+
+    if (source) {
+      source.setData(data);
+    }
+  }, [stopsGeoJson]);
 
   return (
     <div

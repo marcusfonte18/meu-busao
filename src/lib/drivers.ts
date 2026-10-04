@@ -206,3 +206,70 @@ export function routeShapesToGeoJson(
     features,
   };
 }
+
+/**
+ * Converte RouteStopsMap em GeoJSON FeatureCollection de Points para o MapLibre.
+ * Cola as paradas na polyline mais próxima e inverte coordenadas para [lng, lat].
+ */
+export function routeStopsToGeoJson(
+  routeStops: RouteStopsMap,
+  routeShapes: RouteShapesMap = {},
+  polyOrderSwapped: Record<string, boolean> = {},
+  selectedDirectionsByLine: SelectedDirectionsByLine = {}
+): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
+
+  for (const [linha, positions] of Object.entries(routeStops)) {
+    const polylines = routeShapes[linha];
+    const poly0 = polylines?.[0];
+    const poly1 = polylines?.[1];
+    const swapped = polyOrderSwapped[linha];
+    const dirs = selectedDirectionsByLine[linha] ?? { ida: true, volta: true };
+    const hasDirection =
+      poly0 && poly0.length >= 2 && poly1 && poly1.length >= 2;
+    const isBrt = getLineType(linha) === "brt";
+    const lineColor = isBrt ? SECONDARY_COLOR : getLineHex(linha);
+
+    positions.forEach(([lat, lng], idx) => {
+      let finalLat = lat;
+      let finalLng = lng;
+
+      if (hasDirection) {
+        const dist0 = minDistSqToPolyline(lat, lng, poly0);
+        const dist1 = minDistSqToPolyline(lat, lng, poly1);
+        const geoIsIda = dist0 <= dist1 ? !swapped : swapped;
+        const isSelected = geoIsIda ? dirs.ida : dirs.volta;
+        if (!isSelected) return;
+
+        const poly = dist0 <= dist1 ? poly0 : poly1;
+        const onLine = getClosestPointOnPolyline(lat, lng, poly);
+        if (onLine) {
+          finalLat = onLine[0];
+          finalLng = onLine[1];
+        }
+      } else {
+        if (!dirs.ida && !dirs.volta) return;
+      }
+
+      features.push({
+        type: "Feature",
+        id: `stop-${linha}-${idx}`,
+        properties: {
+          linha,
+          color: lineColor,
+        },
+        geometry: {
+          type: "Point",
+          // Inversão para GeoJSON: [lng, lat]
+          coordinates: [finalLng, finalLat],
+        },
+      });
+    });
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  };
+}
+
