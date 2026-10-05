@@ -24,8 +24,10 @@ model Bus {
   datahoraenvio    DateTime @default(now())
   datahoraservidor DateTime @default(now())
   timestamp        DateTime @default(now())
+  direcao          Float?
 
   @@map("onibuses")
+  @@index([linha])
 }
 
 model Line {
