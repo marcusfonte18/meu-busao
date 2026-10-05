@@ -1,6 +1,10 @@
 import prisma from "@/lib/prisma";
 
-export type RouteStopsMap = Record<string, [number, number][]>;
+export type RouteStopItem =
+  | [number, number, string?]
+  | { lat: number; lng: number; name?: string };
+
+export type RouteStopsMap = Record<string, RouteStopItem[]>;
 
 /**
  * Busca paradas das linhas no banco (coleção route_stops).
@@ -17,7 +21,7 @@ export async function getRouteStopsFromDb(
 
   const result: RouteStopsMap = {};
   for (const row of rows) {
-    const positions = row.positions as unknown as [number, number][];
+    const positions = row.positions as unknown as RouteStopItem[];
     if (Array.isArray(positions) && positions.length > 0) {
       result[row.linha] = positions;
     }

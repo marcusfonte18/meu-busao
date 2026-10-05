@@ -105,14 +105,16 @@ function loadStopsFromGTFS() {
   const stopIdIdx = stopsHeader.indexOf("stop_id");
   const latIdx = stopsHeader.indexOf("stop_lat");
   const lonIdx = stopsHeader.indexOf("stop_lon");
+  const nameIdx = stopsHeader.indexOf("stop_name");
   if (stopIdIdx === -1 || latIdx === -1 || lonIdx === -1) return null;
   for (let i = 1; i < stopsLines.length; i++) {
     const row = parseCSVLine(stopsLines[i]);
     const id = row[stopIdIdx];
     const lat = parseFloat(row[latIdx]);
     const lon = parseFloat(row[lonIdx]);
+    const name = nameIdx !== -1 ? (row[nameIdx] || "").trim() : "";
     if (id && !isNaN(lat) && !isNaN(lon)) {
-      stopIdToPosition.set(id, [lat, lon]);
+      stopIdToPosition.set(id, [lat, lon, name]);
     }
   }
 
@@ -146,9 +148,7 @@ async function main() {
   const { routeShortNameToStopIds, stopIdToPosition } = data;
   const prisma = new PrismaClient();
 
-  let inserted = 0;
-  let updated = 0;
-
+  const entries = [];
   for (const [linha, stopIds] of routeShortNameToStopIds) {
     const positions = [];
     const seen = new Set();
@@ -159,25 +159,31 @@ async function main() {
         positions.push(pos);
       }
     }
-    if (positions.length === 0) continue;
-
-    const existing = await prisma.routeStop.findUnique({ where: { linha } });
-    if (existing) {
-      await prisma.routeStop.update({
-        where: { linha },
-        data: { positions },
-      });
-      updated++;
-    } else {
-      await prisma.routeStop.create({
-        data: { linha, positions },
-      });
-      inserted++;
+    if (positions.length > 0) {
+      entries.push({ linha, positions });
     }
   }
 
+  console.log(`Atualizando ${entries.length} linhas com paradas e nomes...`);
+  let processed = 0;
+  const BATCH_SIZE = 25;
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const chunk = entries.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      chunk.map((item) =>
+        prisma.routeStop.upsert({
+          where: { linha: item.linha },
+          create: { linha: item.linha, positions: item.positions },
+          update: { positions: item.positions },
+        })
+      )
+    );
+    processed += chunk.length;
+    process.stdout.write(`\rProgresso: ${processed}/${entries.length}`);
+  }
+
+  console.log("\nConcluído com sucesso!");
   await prisma.$disconnect();
-  console.log(`Route stops: ${inserted} inseridas, ${updated} atualizadas.`);
   console.log("Em produção a API usará esses dados do banco (não precisa da pasta GTFS).");
 }
 

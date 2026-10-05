@@ -3,7 +3,10 @@ import { getLineHex } from "@/lib/line-colors";
 import { getLineType } from "@/app/types";
 
 export type RouteShapesMap = Record<string, [number, number][][]>;
-export type RouteStopsMap = Record<string, [number, number][]>;
+export type RouteStopItem =
+  | [number, number, string?]
+  | { lat: number; lng: number; name?: string };
+export type RouteStopsMap = Record<string, RouteStopItem[]>;
 export type SelectedDirections = { ida: boolean; volta: boolean };
 export type SelectedDirectionsByLine = Record<string, SelectedDirections>;
 
@@ -230,7 +233,23 @@ export function routeStopsToGeoJson(
     const isBrt = getLineType(linha) === "brt";
     const lineColor = isBrt ? SECONDARY_COLOR : getLineHex(linha);
 
-    positions.forEach(([lat, lng], idx) => {
+    positions.forEach((pos, idx) => {
+      let lat: number;
+      let lng: number;
+      let name = "";
+
+      if (Array.isArray(pos)) {
+        lat = pos[0];
+        lng = pos[1];
+        name = typeof pos[2] === "string" ? pos[2] : "";
+      } else if (pos && typeof pos === "object") {
+        lat = (pos as { lat: number }).lat;
+        lng = (pos as { lng: number }).lng;
+        name = (pos as { name?: string }).name || "";
+      } else {
+        return;
+      }
+
       let finalLat = lat;
       let finalLng = lng;
 
@@ -256,6 +275,7 @@ export function routeStopsToGeoJson(
         id: `stop-${linha}-${idx}`,
         properties: {
           linha,
+          name,
           color: lineColor,
         },
         geometry: {

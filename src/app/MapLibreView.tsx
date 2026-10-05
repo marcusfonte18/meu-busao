@@ -94,6 +94,7 @@ export function MapLibreView({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const isLoadedRef = useRef(false);
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const stopPopupRef = useRef<maplibregl.Popup | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const isNative = isNativePlatform();
 
@@ -240,11 +241,11 @@ export function MapLibreView({
             ["linear"],
             ["zoom"],
             12,
-            1.5,
+            2,
             14,
-            3,
+            3.5,
             16,
-            4.5,
+            5.5,
           ],
           "circle-color": "#ffffff",
           "circle-stroke-color": ["coalesce", ["get", "color"], "#10b981"],
@@ -267,6 +268,28 @@ export function MapLibreView({
             12.5,
             1,
           ],
+        },
+      });
+
+      // Área invisível ampliada para facilitar o clique/toque na parada
+      map.addLayer({
+        id: "route-stops-hitarea",
+        type: "circle",
+        source: "route-stops",
+        paint: {
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            12,
+            10,
+            14,
+            14,
+            16,
+            18,
+          ],
+          "circle-opacity": 0,
+          "circle-stroke-opacity": 0,
         },
       });
     }
@@ -442,6 +465,64 @@ export function MapLibreView({
         map.getCanvas().style.cursor = "";
       });
 
+      // Eventos de clique e hover nas paradas (Stops)
+      const handleStopClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+        const feature = e.features?.[0];
+        if (!feature) return;
+
+        const coordinates = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+        const name = (feature.properties?.name || "").trim() || "Ponto de Ônibus";
+        const linha = feature.properties?.linha || "";
+        const color = feature.properties?.color || DEFAULT_LINE_COLOR;
+
+        if (stopPopupRef.current) {
+          stopPopupRef.current.remove();
+        }
+
+        const popup = new maplibregl.Popup({
+          offset: 10,
+          closeButton: true,
+          closeOnClick: true,
+          className: "custom-bus-stop-popup",
+        })
+          .setLngLat(coordinates)
+          .setHTML(`
+            <div style="font-family: inherit; padding: 2px 4px; min-width: 140px; max-width: 230px;">
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px;">
+                <span style="background-color: ${color}; color: #ffffff; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.3px;">
+                  ${linha}
+                </span>
+                <span style="font-size: 10px; color: #6b7280; text-transform: uppercase; font-weight: 600;">
+                  Parada
+                </span>
+              </div>
+              <div style="font-weight: 600; font-size: 13px; line-height: 1.35; color: inherit;">
+                ${name}
+              </div>
+            </div>
+          `)
+          .addTo(map);
+
+        stopPopupRef.current = popup;
+      };
+
+      map.on("click", "route-stops-circles", handleStopClick);
+      map.on("click", "route-stops-hitarea", handleStopClick);
+
+      map.on("mouseenter", "route-stops-circles", () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseenter", "route-stops-hitarea", () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+
+      map.on("mouseleave", "route-stops-circles", () => {
+        map.getCanvas().style.cursor = "";
+      });
+      map.on("mouseleave", "route-stops-hitarea", () => {
+        map.getCanvas().style.cursor = "";
+      });
+
       onMapLoaded?.(map);
     });
 
@@ -458,6 +539,10 @@ export function MapLibreView({
       if (userMarkerRef.current) {
         userMarkerRef.current.remove();
         userMarkerRef.current = null;
+      }
+      if (stopPopupRef.current) {
+        stopPopupRef.current.remove();
+        stopPopupRef.current = null;
       }
       map.remove();
       mapRef.current = null;
