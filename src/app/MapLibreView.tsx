@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Locate } from "lucide-react";
+import { Locate, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 import {
   getCurrentPosition,
@@ -25,7 +25,8 @@ interface MapLibreViewProps {
 }
 
 const DEFAULT_CENTER_LNG_LAT: [number, number] = [-43.1729, -22.9068];
-const DEFAULT_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+const LIGHT_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+const DARK_STYLE = "https://tiles.openfreemap.org/styles/dark";
 
 export function MapLibreView({
   initialCenter = DEFAULT_CENTER_LNG_LAT,
@@ -44,6 +45,35 @@ export function MapLibreView({
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const isNative = isNativePlatform();
+
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const saved = localStorage.getItem("meu-busao-theme");
+    if (saved) return saved === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  const routesGeoJsonRef = useRef(routesGeoJson);
+  const stopsGeoJsonRef = useRef(stopsGeoJson);
+  const vehiclesGeoJsonRef = useRef(vehiclesGeoJson);
+
+  useEffect(() => {
+    routesGeoJsonRef.current = routesGeoJson;
+  }, [routesGeoJson]);
+
+  useEffect(() => {
+    stopsGeoJsonRef.current = stopsGeoJson;
+  }, [stopsGeoJson]);
+
+  useEffect(() => {
+    vehiclesGeoJsonRef.current = vehiclesGeoJson;
+  }, [vehiclesGeoJson]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      document.documentElement.classList.toggle("dark", isDarkMode);
+    }
+  }, [isDarkMode]);
 
   // Normaliza o centro para [lng, lat] (MapLibre usa [longitude, latitude])
   const centerLngLat: [number, number] = React.useMemo(() => {
@@ -88,6 +118,224 @@ export function MapLibreView({
     };
   }, []);
 
+  const setupCustomLayers = useCallback((map: maplibregl.Map) => {
+    // 1. Source e Layers de Rotas (traçados)
+    if (!map.getSource("route-shapes")) {
+      map.addSource("route-shapes", {
+        type: "geojson",
+        data: routesGeoJsonRef.current || { type: "FeatureCollection", features: [] },
+      });
+
+      map.addLayer({
+        id: "route-shapes-casing",
+        type: "line",
+        source: "route-shapes",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": "rgba(0, 0, 0, 0.25)",
+          "line-width": 5.5,
+        },
+      });
+
+      map.addLayer({
+        id: "route-shapes-line",
+        type: "line",
+        source: "route-shapes",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": ["coalesce", ["get", "color"], "#10b981"],
+          "line-width": 3.5,
+          "line-opacity": 0.9,
+        },
+      });
+    }
+
+    // 2. Source e Layer de Paradas (Stops)
+    if (!map.getSource("route-stops")) {
+      map.addSource("route-stops", {
+        type: "geojson",
+        data: stopsGeoJsonRef.current || { type: "FeatureCollection", features: [] },
+      });
+
+      map.addLayer({
+        id: "route-stops-circles",
+        type: "circle",
+        source: "route-stops",
+        paint: {
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            12,
+            1.5,
+            14,
+            3,
+            16,
+            4.5,
+          ],
+          "circle-color": "#ffffff",
+          "circle-stroke-color": ["coalesce", ["get", "color"], "#10b981"],
+          "circle-stroke-width": 2,
+          "circle-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            11.5,
+            0,
+            12.5,
+            1,
+          ],
+          "circle-stroke-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            11.5,
+            0,
+            12.5,
+            1,
+          ],
+        },
+      });
+    }
+
+    // 3. Source e Layers de Veículos (Buses / BRT)
+    if (!map.getSource("vehicles")) {
+      map.addSource("vehicles", {
+        type: "geojson",
+        data: vehiclesGeoJsonRef.current || { type: "FeatureCollection", features: [] },
+      });
+
+      // Halo de destaque para o ônibus selecionado
+      map.addLayer({
+        id: "vehicles-selected-halo",
+        type: "circle",
+        source: "vehicles",
+        filter: ["==", ["get", "isSelected"], 1],
+        paint: {
+          "circle-radius": 24,
+          "circle-color": ["coalesce", ["get", "color"], "#10b981"],
+          "circle-opacity": 0.35,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": ["coalesce", ["get", "color"], "#10b981"],
+          "circle-stroke-opacity": 0.7,
+        },
+      });
+
+      // Círculo principal do ônibus
+      map.addLayer({
+        id: "vehicles-circle",
+        type: "circle",
+        source: "vehicles",
+        paint: {
+          "circle-radius": [
+            "case",
+            ["==", ["get", "isSelected"], 1],
+            18,
+            15,
+          ],
+          "circle-color": ["coalesce", ["get", "color"], "#10b981"],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2.5,
+        },
+      });
+
+      // Indicador de direção (triângulo apontando para o heading)
+      map.addLayer({
+        id: "vehicles-direction",
+        type: "symbol",
+        source: "vehicles",
+        layout: {
+          "text-field": "▲",
+          "text-font": ["Noto Sans Regular"],
+          "text-size": [
+            "case",
+            ["==", ["get", "isSelected"], 1],
+            12,
+            10,
+          ],
+          "text-rotate": ["coalesce", ["get", "heading"], 0],
+          "text-rotation-alignment": "map",
+          "text-offset": [0, -1.5],
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+        },
+        paint: {
+          "text-color": ["coalesce", ["get", "color"], "#10b981"],
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.5,
+        },
+      });
+
+      // Número da linha no centro do círculo
+      map.addLayer({
+        id: "vehicles-label",
+        type: "symbol",
+        source: "vehicles",
+        layout: {
+          "text-field": ["to-string", ["coalesce", ["get", "linha"], ""]],
+          "text-font": ["Noto Sans Bold"],
+          "text-size": [
+            "case",
+            ["==", ["get", "isSelected"], 1],
+            12,
+            10,
+          ],
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+        },
+        paint: {
+          "text-color": "#ffffff",
+        },
+      });
+
+      // Badge de velocidade acima do veículo quando selecionado
+      map.addLayer({
+        id: "vehicles-speed",
+        type: "symbol",
+        source: "vehicles",
+        filter: [
+          "all",
+          ["==", ["get", "isSelected"], 1],
+          [">", ["get", "speed"], 0],
+        ],
+        layout: {
+          "text-field": ["to-string", ["coalesce", ["get", "speedLabel"], ""]],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 10,
+          "text-offset": [0, -2.6],
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+        },
+        paint: {
+          "text-color": "#ffffff",
+          "text-halo-color": "rgba(0,0,0,0.85)",
+          "text-halo-width": 4,
+        },
+      });
+    }
+  }, []);
+
+  // Alterna Modo Noturno / Claro
+  const toggleDarkMode = useCallback(() => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        document.documentElement.classList.toggle("dark", next);
+        localStorage.setItem("meu-busao-theme", next ? "dark" : "light");
+      }
+      if (mapRef.current) {
+        mapRef.current.setStyle(next ? DARK_STYLE : LIGHT_STYLE);
+      }
+      return next;
+    });
+  }, []);
+
   // Inicialização do Mapa
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -96,9 +344,11 @@ export function MapLibreView({
       maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
     }
 
+    const currentStyle = isDarkMode ? DARK_STYLE : LIGHT_STYLE;
+
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: DEFAULT_STYLE,
+      style: currentStyle,
       center: centerLngLat,
       zoom: initialZoom,
       attributionControl: {},
@@ -107,14 +357,6 @@ export function MapLibreView({
     map.on("error", (e) => {
       console.warn("MapLibre GL:", e);
     });
-
-    map.addControl(
-      new maplibregl.NavigationControl({
-        showCompass: true,
-        showZoom: true,
-      }),
-      "top-right"
-    );
 
     const ro = new ResizeObserver(() => {
       map.resize();
@@ -126,207 +368,7 @@ export function MapLibreView({
     map.on("load", () => {
       isLoadedRef.current = true;
       map.resize();
-
-      // 1. Source e Layers de Rotas (traçados)
-      if (!map.getSource("route-shapes")) {
-        map.addSource("route-shapes", {
-          type: "geojson",
-          data: routesGeoJson || { type: "FeatureCollection", features: [] },
-        });
-
-        map.addLayer({
-          id: "route-shapes-casing",
-          type: "line",
-          source: "route-shapes",
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
-          paint: {
-            "line-color": "rgba(0, 0, 0, 0.25)",
-            "line-width": 5.5,
-          },
-        });
-
-        map.addLayer({
-          id: "route-shapes-line",
-          type: "line",
-          source: "route-shapes",
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
-          paint: {
-            "line-color": ["coalesce", ["get", "color"], "#10b981"],
-            "line-width": 3.5,
-            "line-opacity": 0.9,
-          },
-        });
-      }
-
-      // 2. Source e Layer de Paradas (Stops)
-      if (!map.getSource("route-stops")) {
-        map.addSource("route-stops", {
-          type: "geojson",
-          data: stopsGeoJson || { type: "FeatureCollection", features: [] },
-        });
-
-        map.addLayer({
-          id: "route-stops-circles",
-          type: "circle",
-          source: "route-stops",
-          paint: {
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12,
-              1.5,
-              14,
-              3,
-              16,
-              4.5,
-            ],
-            "circle-color": "#ffffff",
-            "circle-stroke-color": ["coalesce", ["get", "color"], "#10b981"],
-            "circle-stroke-width": 2,
-            "circle-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              11.5,
-              0,
-              12.5,
-              1,
-            ],
-            "circle-stroke-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              11.5,
-              0,
-              12.5,
-              1,
-            ],
-          },
-        });
-      }
-
-      // 3. Source e Layers de Veículos (Buses / BRT)
-      if (!map.getSource("vehicles")) {
-        map.addSource("vehicles", {
-          type: "geojson",
-          data: vehiclesGeoJson || { type: "FeatureCollection", features: [] },
-        });
-
-        // Halo de destaque para o ônibus selecionado
-        map.addLayer({
-          id: "vehicles-selected-halo",
-          type: "circle",
-          source: "vehicles",
-          filter: ["==", ["get", "isSelected"], 1],
-          paint: {
-            "circle-radius": 24,
-            "circle-color": ["coalesce", ["get", "color"], "#10b981"],
-            "circle-opacity": 0.35,
-            "circle-stroke-width": 2,
-            "circle-stroke-color": ["coalesce", ["get", "color"], "#10b981"],
-            "circle-stroke-opacity": 0.7,
-          },
-        });
-
-        // Círculo principal do ônibus
-        map.addLayer({
-          id: "vehicles-circle",
-          type: "circle",
-          source: "vehicles",
-          paint: {
-            "circle-radius": [
-              "case",
-              ["==", ["get", "isSelected"], 1],
-              18,
-              15,
-            ],
-            "circle-color": ["coalesce", ["get", "color"], "#10b981"],
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 2.5,
-          },
-        });
-
-        // Indicador de direção (triângulo apontando para o heading)
-        map.addLayer({
-          id: "vehicles-direction",
-          type: "symbol",
-          source: "vehicles",
-          layout: {
-            "text-field": "▲",
-            "text-font": ["Noto Sans Regular"],
-            "text-size": [
-              "case",
-              ["==", ["get", "isSelected"], 1],
-              12,
-              10,
-            ],
-            "text-rotate": ["coalesce", ["get", "heading"], 0],
-            "text-rotation-alignment": "map",
-            "text-offset": [0, -1.5],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          },
-          paint: {
-            "text-color": ["coalesce", ["get", "color"], "#10b981"],
-            "text-halo-color": "#ffffff",
-            "text-halo-width": 1.5,
-          },
-        });
-
-        // Número da linha no centro do círculo
-        map.addLayer({
-          id: "vehicles-label",
-          type: "symbol",
-          source: "vehicles",
-          layout: {
-            "text-field": ["to-string", ["coalesce", ["get", "linha"], ""]],
-            "text-font": ["Noto Sans Bold"],
-            "text-size": [
-              "case",
-              ["==", ["get", "isSelected"], 1],
-              12,
-              10,
-            ],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          },
-          paint: {
-            "text-color": "#ffffff",
-          },
-        });
-
-        // Badge de velocidade acima do veículo quando selecionado
-        map.addLayer({
-          id: "vehicles-speed",
-          type: "symbol",
-          source: "vehicles",
-          filter: [
-            "all",
-            ["==", ["get", "isSelected"], 1],
-            [">", ["get", "speed"], 0],
-          ],
-          layout: {
-            "text-field": ["to-string", ["coalesce", ["get", "speedLabel"], ""]],
-            "text-font": ["Noto Sans Regular"],
-            "text-size": 10,
-            "text-offset": [0, -2.6],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          },
-          paint: {
-            "text-color": "#ffffff",
-            "text-halo-color": "rgba(0,0,0,0.85)",
-            "text-halo-width": 4,
-          },
-        });
-      }
+      setupCustomLayers(map);
 
       // Eventos de clique e hover no veículo
       map.on("click", "vehicles-circle", (e) => {
@@ -345,6 +387,13 @@ export function MapLibreView({
       });
 
       onMapLoaded?.(map);
+    });
+
+    // Quando o estilo é alterado (Modo Noturno / Claro), recoloca os layers customizados
+    map.on("styledata", () => {
+      if (map.isStyleLoaded() && !map.getSource("vehicles")) {
+        setupCustomLayers(map);
+      }
     });
 
     mapRef.current = map;
@@ -482,20 +531,40 @@ export function MapLibreView({
         ref={containerRef}
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
       />
-      {/* Botão de Localização do Usuário */}
-      <div className="absolute right-3 top-14 z-10">
+
+      {/* Controles Flutuantes do Mapa (Modo Noturno + Geolocalização) */}
+      <div className="absolute right-3 top-3 z-10 flex flex-col rounded-lg bg-card/95 backdrop-blur-sm border border-border shadow-md overflow-hidden">
+        {/* Botão de Modo Noturno / Claro */}
+        <button
+          type="button"
+          onClick={toggleDarkMode}
+          className="flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/60 active:bg-accent transition-colors"
+          title={isDarkMode ? "Mudar para modo claro" : "Mudar para modo noturno"}
+          aria-label={isDarkMode ? "Modo Claro" : "Modo Noturno"}
+        >
+          {isDarkMode ? (
+            <Sun className="h-4 w-4 text-amber-400" />
+          ) : (
+            <Moon className="h-4 w-4 text-slate-700 dark:text-slate-300" />
+          )}
+        </button>
+
+        <div className="h-px w-full bg-border/70" />
+
+        {/* Botão de Localização do Usuário */}
         <button
           type="button"
           onClick={toggleLocation}
           className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-xl shadow-md transition-colors",
+            "flex h-9 w-9 items-center justify-center transition-colors",
             isTracking
-              ? "bg-primary text-primary-foreground shadow-primary/25 hover:bg-primary/90"
-              : "bg-card text-muted-foreground hover:bg-card/90 hover:text-foreground"
+              ? "bg-primary/15 text-primary hover:bg-primary/20"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent/60 active:bg-accent"
           )}
-          title={isTracking ? "Parar de rastrear" : "Rastrear localização"}
+          title={isTracking ? "Parar de rastrear localização" : "Rastrear minha localização"}
+          aria-label="Localização"
         >
-          <Locate className="h-5 w-5" />
+          <Locate className={cn("h-4 w-4", isTracking && "animate-pulse")} />
         </button>
       </div>
     </div>
@@ -503,3 +572,4 @@ export function MapLibreView({
 }
 
 export default MapLibreView;
+
