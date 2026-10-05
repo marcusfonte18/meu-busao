@@ -420,9 +420,17 @@ export function busesToGeoJson(
 /** Formata a data/hora da última atualização para exibição amigável */
 export function formatLastUpdate(timestamp: string): string {
   try {
+    if (!timestamp) return "—";
     const d = new Date(timestamp);
     const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
+    let diffMs = now.getTime() - d.getTime();
+
+    // Se a diferença for de aprox. 3 horas (+- 15 min), compensa o offset de fuso do DataRio (horário de Brasília salvo com Z)
+    if (diffMs >= 2.75 * 3600 * 1000 && diffMs <= 3.25 * 3600 * 1000) {
+      diffMs -= 3 * 3600 * 1000;
+    }
+
+    if (diffMs <= 30 * 1000) return "agora";
     const diffSec = Math.floor(diffMs / 1000);
     if (diffSec < 60) return "agora";
     const diffMin = Math.floor(diffSec / 60);

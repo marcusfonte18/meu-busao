@@ -120,23 +120,25 @@ export async function syncBusesFromDataRio(): Promise<{ count: number }> {
       direcao = Number(item.direcao);
     }
 
-    const datahora = item.datetime
-      ? new Date(item.datetime)
-      : item.datahora
-      ? new Date(parseInt(item.datahora, 10))
-      : new Date();
+    // DataRio SPPO envia datetime no horário de Brasília com sufixo Z indevido
+    const parseDataRioDate = (val: any) => {
+      if (!val) return new Date();
+      if (typeof val === "string" && val.endsWith("Z")) {
+        return new Date(val.replace(/Z$/, "-03:00"));
+      }
+      if (typeof val === "string" && /^\d+$/.test(val)) {
+        return new Date(parseInt(val, 10));
+      }
+      return new Date(val);
+    };
 
-    const datahoraenvio = item.datetime_envio
-      ? new Date(item.datetime_envio)
-      : item.datahoraenvio
-      ? new Date(parseInt(item.datahoraenvio, 10))
-      : datahora;
-
-    const datahoraservidor = item.datetime_servidor
-      ? new Date(item.datetime_servidor)
-      : item.datahoraservidor
-      ? new Date(parseInt(item.datahoraservidor, 10))
-      : datahora;
+    const datahora = parseDataRioDate(item.datetime || item.datahora);
+    const datahoraenvio = parseDataRioDate(
+      item.datetime_envio || item.datahoraenvio
+    );
+    const datahoraservidor = parseDataRioDate(
+      item.datetime_servidor || item.datahoraservidor
+    );
 
     return {
       ordem,
