@@ -57,17 +57,10 @@ export function MapLibreView({
   const stopsGeoJsonRef = useRef(stopsGeoJson);
   const vehiclesGeoJsonRef = useRef(vehiclesGeoJson);
 
-  useEffect(() => {
-    routesGeoJsonRef.current = routesGeoJson;
-  }, [routesGeoJson]);
-
-  useEffect(() => {
-    stopsGeoJsonRef.current = stopsGeoJson;
-  }, [stopsGeoJson]);
-
-  useEffect(() => {
-    vehiclesGeoJsonRef.current = vehiclesGeoJson;
-  }, [vehiclesGeoJson]);
+  // Mantém refs síncronos com as props mais recentes
+  routesGeoJsonRef.current = routesGeoJson;
+  stopsGeoJsonRef.current = stopsGeoJson;
+  vehiclesGeoJsonRef.current = vehiclesGeoJson;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -119,11 +112,29 @@ export function MapLibreView({
   }, []);
 
   const setupCustomLayers = useCallback((map: maplibregl.Map) => {
+    const routesData = routesGeoJsonRef.current || {
+      type: "FeatureCollection",
+      features: [],
+    };
+    const stopsData = stopsGeoJsonRef.current || {
+      type: "FeatureCollection",
+      features: [],
+    };
+    const vehiclesData = vehiclesGeoJsonRef.current || {
+      type: "FeatureCollection",
+      features: [],
+    };
+
     // 1. Source e Layers de Rotas (traçados)
-    if (!map.getSource("route-shapes")) {
+    const routeSource = map.getSource("route-shapes") as
+      | maplibregl.GeoJSONSource
+      | undefined;
+    if (routeSource) {
+      routeSource.setData(routesData);
+    } else {
       map.addSource("route-shapes", {
         type: "geojson",
-        data: routesGeoJsonRef.current || { type: "FeatureCollection", features: [] },
+        data: routesData,
       });
 
       map.addLayer({
@@ -157,10 +168,15 @@ export function MapLibreView({
     }
 
     // 2. Source e Layer de Paradas (Stops)
-    if (!map.getSource("route-stops")) {
+    const stopsSource = map.getSource("route-stops") as
+      | maplibregl.GeoJSONSource
+      | undefined;
+    if (stopsSource) {
+      stopsSource.setData(stopsData);
+    } else {
       map.addSource("route-stops", {
         type: "geojson",
-        data: stopsGeoJsonRef.current || { type: "FeatureCollection", features: [] },
+        data: stopsData,
       });
 
       map.addLayer({
@@ -205,10 +221,15 @@ export function MapLibreView({
     }
 
     // 3. Source e Layers de Veículos (Buses / BRT)
-    if (!map.getSource("vehicles")) {
+    const vehiclesSource = map.getSource("vehicles") as
+      | maplibregl.GeoJSONSource
+      | undefined;
+    if (vehiclesSource) {
+      vehiclesSource.setData(vehiclesData);
+    } else {
       map.addSource("vehicles", {
         type: "geojson",
-        data: vehiclesGeoJsonRef.current || { type: "FeatureCollection", features: [] },
+        data: vehiclesData,
       });
 
       // Halo de destaque para o ônibus selecionado
@@ -329,12 +350,16 @@ export function MapLibreView({
         document.documentElement.classList.toggle("dark", next);
         localStorage.setItem("meu-busao-theme", next ? "dark" : "light");
       }
-      if (mapRef.current) {
-        mapRef.current.setStyle(next ? DARK_STYLE : LIGHT_STYLE);
+      const map = mapRef.current;
+      if (map) {
+        map.once("style.load", () => {
+          setupCustomLayers(map);
+        });
+        map.setStyle(next ? DARK_STYLE : LIGHT_STYLE);
       }
       return next;
     });
-  }, []);
+  }, [setupCustomLayers]);
 
   // Inicialização do Mapa
   useEffect(() => {
@@ -389,11 +414,9 @@ export function MapLibreView({
       onMapLoaded?.(map);
     });
 
-    // Quando o estilo é alterado (Modo Noturno / Claro), recoloca os layers customizados
-    map.on("styledata", () => {
-      if (map.isStyleLoaded() && !map.getSource("vehicles")) {
-        setupCustomLayers(map);
-      }
+    // Quando o estilo é recarregado (Modo Noturno / Claro), garante que os layers customizados existam
+    map.on("style.load", () => {
+      setupCustomLayers(map);
     });
 
     mapRef.current = map;
