@@ -28,6 +28,57 @@ const DEFAULT_CENTER_LNG_LAT: [number, number] = [-43.1729, -22.9068];
 const LIGHT_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const DARK_STYLE = "https://tiles.openfreemap.org/styles/dark";
 
+const BUS_ICON_PREFIX = "bus-";
+const DEFAULT_LINE_COLOR = "#10b981";
+// Ônibus visto de frente (viewBox 24x24)
+const BUS_BODY_PATH =
+  "M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10z";
+// Para-brisa e faróis (pintados de branco por cima da carroceria)
+const BUS_DETAILS_PATH =
+  "M7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17z" +
+  "M16.5 17c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" +
+  "M18 11H6V6h12v5z";
+
+/**
+ * Gera o ícone do ônibus (id = "bus-<cor>"): círculo na cor da linha com borda
+ * branca e sombra, e um ônibus branco grande dentro. Chamado via `styleimagemissing`.
+ */
+function addBusIcon(map: maplibregl.Map, id: string) {
+  if (map.hasImage(id)) return;
+  const color = id.slice(BUS_ICON_PREFIX.length) || DEFAULT_LINE_COLOR;
+  const ratio = 3;
+  const units = 40; // círculo de 32 + margem para borda e sombra
+  const size = units * ratio;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.scale(ratio, ratio);
+
+  // Disco na cor da linha com borda branca e sombra
+  ctx.beginPath();
+  ctx.arc(20, 19, 16, 0, Math.PI * 2);
+  ctx.shadowColor = "rgba(0,0,0,0.4)";
+  ctx.shadowBlur = 3;
+  ctx.shadowOffsetY = 1.5;
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+
+  // Ônibus branco centralizado (para-brisa e faróis vazados na cor da linha)
+  const scale = 0.9;
+  ctx.translate(20 - 12 * scale, 19 - 11.5 * scale);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill(new Path2D(BUS_BODY_PATH + BUS_DETAILS_PATH), "evenodd");
+
+  map.addImage(id, ctx.getImageData(0, 0, size, size), { pixelRatio: ratio });
+}
+
 export function MapLibreView({
   initialCenter = DEFAULT_CENTER_LNG_LAT,
   initialZoom = 13,
@@ -239,61 +290,33 @@ export function MapLibreView({
         source: "vehicles",
         filter: ["==", ["get", "isSelected"], 1],
         paint: {
-          "circle-radius": 24,
-          "circle-color": ["coalesce", ["get", "color"], "#10b981"],
-          "circle-opacity": 0.35,
+          "circle-radius": 26,
+          "circle-color": ["coalesce", ["get", "color"], DEFAULT_LINE_COLOR],
+          "circle-opacity": 0.25,
           "circle-stroke-width": 2,
-          "circle-stroke-color": ["coalesce", ["get", "color"], "#10b981"],
+          "circle-stroke-color": ["coalesce", ["get", "color"], DEFAULT_LINE_COLOR],
           "circle-stroke-opacity": 0.7,
         },
       });
 
-      // Círculo principal do ônibus
+      // Ícone do ônibus na cor da linha (gerado em `styleimagemissing`)
       map.addLayer({
-        id: "vehicles-circle",
-        type: "circle",
-        source: "vehicles",
-        paint: {
-          "circle-radius": [
-            "case",
-            ["==", ["get", "isSelected"], 1],
-            18,
-            15,
-          ],
-          "circle-color": ["coalesce", ["get", "color"], "#10b981"],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 2.5,
-        },
-      });
-
-      // Indicador de direção (triângulo apontando para o heading)
-      map.addLayer({
-        id: "vehicles-direction",
+        id: "vehicles-icon",
         type: "symbol",
         source: "vehicles",
         layout: {
-          "text-field": "▲",
-          "text-font": ["Noto Sans Regular"],
-          "text-size": [
-            "case",
-            ["==", ["get", "isSelected"], 1],
-            12,
-            10,
+          "icon-image": [
+            "concat",
+            BUS_ICON_PREFIX,
+            ["coalesce", ["get", "color"], DEFAULT_LINE_COLOR],
           ],
-          "text-rotate": ["coalesce", ["get", "heading"], 0],
-          "text-rotation-alignment": "map",
-          "text-offset": [0, -1.5],
-          "text-allow-overlap": true,
-          "text-ignore-placement": true,
-        },
-        paint: {
-          "text-color": ["coalesce", ["get", "color"], "#10b981"],
-          "text-halo-color": "#ffffff",
-          "text-halo-width": 1.5,
+          "icon-size": ["case", ["==", ["get", "isSelected"], 1], 1.2, 1],
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
         },
       });
 
-      // Número da linha no centro do círculo
+      // Número da linha em uma "pílula" acima do ônibus
       map.addLayer({
         id: "vehicles-label",
         type: "symbol",
@@ -307,15 +330,18 @@ export function MapLibreView({
             12,
             10,
           ],
+          "text-offset": [0, -3],
           "text-allow-overlap": true,
           "text-ignore-placement": true,
         },
         paint: {
           "text-color": "#ffffff",
+          "text-halo-color": ["coalesce", ["get", "color"], DEFAULT_LINE_COLOR],
+          "text-halo-width": 3,
         },
       });
 
-      // Badge de velocidade acima do veículo quando selecionado
+      // Badge de velocidade abaixo do veículo quando selecionado
       map.addLayer({
         id: "vehicles-speed",
         type: "symbol",
@@ -329,7 +355,7 @@ export function MapLibreView({
           "text-field": ["to-string", ["coalesce", ["get", "speedLabel"], ""]],
           "text-font": ["Noto Sans Regular"],
           "text-size": 10,
-          "text-offset": [0, -2.6],
+          "text-offset": [0, 3],
           "text-allow-overlap": true,
           "text-ignore-placement": true,
         },
@@ -383,6 +409,11 @@ export function MapLibreView({
       console.warn("MapLibre GL:", e);
     });
 
+    // Gera o ícone do ônibus na cor da linha quando o estilo pedir (inclusive após setStyle)
+    map.on("styleimagemissing", (e) => {
+      if (e.id.startsWith(BUS_ICON_PREFIX)) addBusIcon(map, e.id);
+    });
+
     const ro = new ResizeObserver(() => {
       map.resize();
     });
@@ -396,18 +427,18 @@ export function MapLibreView({
       setupCustomLayers(map);
 
       // Eventos de clique e hover no veículo
-      map.on("click", "vehicles-circle", (e) => {
+      map.on("click", "vehicles-icon", (e) => {
         const feature = e.features?.[0];
         if (feature?.properties?.id) {
           onSelectBus?.(feature.properties.id);
         }
       });
 
-      map.on("mouseenter", "vehicles-circle", () => {
+      map.on("mouseenter", "vehicles-icon", () => {
         map.getCanvas().style.cursor = "pointer";
       });
 
-      map.on("mouseleave", "vehicles-circle", () => {
+      map.on("mouseleave", "vehicles-icon", () => {
         map.getCanvas().style.cursor = "";
       });
 
