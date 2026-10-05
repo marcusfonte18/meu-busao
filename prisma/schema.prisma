@@ -51,8 +51,11 @@ model Brt {
   dataHora   DateTime
   velocidade Float
   direcao    Float?
+  timestamp  DateTime? @default(now())
 
   @@map("brt")
+  @@index([linha])
+  @@index([timestamp])
 }
 
 /// Traçados das linhas (GTFS shapes) para desenhar no mapa. Populado por: pnpm run seed:route-shapes
