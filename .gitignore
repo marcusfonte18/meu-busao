@@ -53,3 +53,6 @@ ios
 # dados GTFS e GeoJSON (grandes; rodar seed:lines com a pasta local)
 /gtfs_rio-de-janeiro
 itinerario.geojson
+
+.agents/*
+.claude/*
