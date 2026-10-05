@@ -37,6 +37,7 @@ export function useBusData(linhas: Array<string>) {
       }
       return allBuses.current;
     },
-    refetchInterval: 3000,
+    refetchInterval: 8000,
+    staleTime: 5000,
   });
 }
