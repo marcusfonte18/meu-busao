@@ -21,10 +21,14 @@ model Bus {
   longitude        String
   datahora         DateTime @default(now())
   velocidade       String
-  datahoraenvio    DateTime @default(now())
-  datahoraservidor DateTime @default(now())
+  datahoraenvio    DateTime? @default(now())
+  datahoraservidor DateTime? @default(now())
   timestamp        DateTime @default(now())
   direcao          Float?
+  sentido          String?
+  route_id         String?
+  trip_id          String?
+  shape_id         String?
 
   @@map("onibuses")
   @@index([linha])
@@ -51,6 +55,10 @@ model Brt {
   dataHora   DateTime
   velocidade Float
   direcao    Float?
+  sentido    String?
+  route_id   String?
+  trip_id    String?
+  shape_id   String?
   timestamp  DateTime? @default(now())
 
   @@map("brt")

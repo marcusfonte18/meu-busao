@@ -13,8 +13,12 @@ export type BusData = {
   longitude: number;
   velocidade: number;
   timestamp: string;
-  /** Direção em graus (0 = Norte). Vindo da API BRT como "direcao". */
+  /** Direção em graus (0 = Norte). */
   heading?: number;
+  sentido?: string;
+  routeId?: string;
+  tripId?: string;
+  shapeId?: string;
 };
 
 interface BusHistory {

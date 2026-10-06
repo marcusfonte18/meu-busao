@@ -32,6 +32,10 @@ export async function fetchBrtData(linhas: string[]): Promise<BusData[]> {
       timestamp: r.dataHora.toISOString(),
     };
     if (r.direcao != null) bus.heading = r.direcao;
+    if (r.sentido != null) bus.sentido = r.sentido;
+    if (r.route_id != null) bus.routeId = r.route_id;
+    if (r.trip_id != null) bus.tripId = r.trip_id;
+    if (r.shape_id != null) bus.shapeId = r.shape_id;
     return bus;
   });
 }

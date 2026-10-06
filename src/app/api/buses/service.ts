@@ -45,6 +45,10 @@ function processBusData(data: any[], linhas: Array<string>): BusData[] {
       velocidade: Math.round(vel),
       timestamp: timestampStr,
       heading,
+      sentido: bus.sentido ?? undefined,
+      routeId: bus.route_id ?? undefined,
+      tripId: bus.trip_id ?? undefined,
+      shapeId: bus.shape_id ?? undefined,
     });
   });
 
