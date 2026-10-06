@@ -11,6 +11,7 @@ import {
   requestLocationPermission,
 } from "@/lib/geolocation";
 import { cn } from "@/lib/utils";
+import { getHaversineDistance, estimateEtaMinutes } from "@/lib/drivers";
 
 interface MapLibreViewProps {
   initialCenter?: [number, number] | { lat: number; lng: number };
@@ -108,6 +109,8 @@ export function MapLibreView({
   const routesGeoJsonRef = useRef(routesGeoJson);
   const stopsGeoJsonRef = useRef(stopsGeoJson);
   const vehiclesGeoJsonRef = useRef(vehiclesGeoJson);
+  const animFrameRef = useRef<number | null>(null);
+  const currentPositionsRef = useRef<Map<string, [number, number]>>(new Map());
 
   // Mantém refs síncronos com as props mais recentes
   routesGeoJsonRef.current = routesGeoJson;
@@ -475,6 +478,47 @@ export function MapLibreView({
         const linha = feature.properties?.linha || "";
         const color = feature.properties?.color || DEFAULT_LINE_COLOR;
 
+        // Calcula a distância até o ônibus mais próximo da mesma linha
+        let etaHtml = "";
+        const currentVehicles = vehiclesGeoJsonRef.current?.features || [];
+        const lineBuses = currentVehicles.filter(
+          (f) => f.properties?.linha === linha && f.geometry.type === "Point"
+        );
+
+        if (lineBuses.length > 0) {
+          let minDistance = Infinity;
+          let closestSpeed = 0;
+
+          for (const b of lineBuses) {
+            const bCoords = (b.geometry as GeoJSON.Point).coordinates as [number, number];
+            const dist = getHaversineDistance(coordinates, bCoords, true);
+            if (dist < minDistance) {
+              minDistance = dist;
+              closestSpeed = Number(b.properties?.velocidade) || 0;
+            }
+          }
+
+          if (minDistance < 20000) {
+            const estMinutes = estimateEtaMinutes(minDistance, closestSpeed);
+            const distLabel =
+              minDistance < 1000
+                ? `${Math.round(minDistance)}m`
+                : `${(minDistance / 1000).toFixed(1)}km`;
+            etaHtml = `
+              <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(128,128,128,0.2); font-size: 11px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                  <span style="color: #10b981; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;">
+                    🚌 Próximo ônibus:
+                  </span>
+                  <span style="font-weight: 700; color: inherit;">
+                    ~${estMinutes} min (${distLabel})
+                  </span>
+                </div>
+              </div>
+            `;
+          }
+        }
+
         if (stopPopupRef.current) {
           stopPopupRef.current.remove();
         }
@@ -487,7 +531,7 @@ export function MapLibreView({
         })
           .setLngLat(coordinates)
           .setHTML(`
-            <div style="font-family: inherit; padding: 2px 4px; min-width: 140px; max-width: 230px;">
+            <div style="font-family: inherit; padding: 2px 4px; min-width: 140px; max-width: 240px;">
               <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px;">
                 <span style="background-color: ${color}; color: #ffffff; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.3px;">
                   ${linha}
@@ -499,6 +543,7 @@ export function MapLibreView({
               <div style="font-weight: 600; font-size: 13px; line-height: 1.35; color: inherit;">
                 ${name}
               </div>
+              ${etaHtml}
             </div>
           `)
           .addTo(map);
@@ -544,6 +589,10 @@ export function MapLibreView({
         stopPopupRef.current.remove();
         stopPopupRef.current = null;
       }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
       map.remove();
       mapRef.current = null;
     };
@@ -571,15 +620,120 @@ export function MapLibreView({
     if (source) source.setData(data);
   }, [stopsGeoJson]);
 
-  // Atualização dos veículos (Buses / BRT)
+  // Atualização dos veículos com interpolação suave de movimento em WebGL (60 FPS)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isLoadedRef.current) return;
     const source = map.getSource("vehicles") as
       | maplibregl.GeoJSONSource
       | undefined;
+    if (!source) return;
+
     const data = vehiclesGeoJson || { type: "FeatureCollection", features: [] };
-    if (source) source.setData(data);
+    const newFeatures = data.features || [];
+
+    // Se é a primeira carga ou mapa vazio, aplica diretamente sem animar
+    if (currentPositionsRef.current.size === 0 || newFeatures.length === 0) {
+      currentPositionsRef.current.clear();
+      for (const f of newFeatures) {
+        if (f.properties?.id && f.geometry.type === "Point") {
+          currentPositionsRef.current.set(
+            f.properties.id,
+            f.geometry.coordinates as [number, number]
+          );
+        }
+      }
+      source.setData(data);
+      return;
+    }
+
+    // Cancela animação anterior se uma nova carga chegou antes do término
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+
+    // Mapeia posições de partida e posições de destino
+    const startPositions = new Map<string, [number, number]>();
+    const targetPositions = new Map<string, [number, number]>();
+
+    for (const f of newFeatures) {
+      if (!f.properties?.id || f.geometry.type !== "Point") continue;
+      const id = f.properties.id;
+      const target = f.geometry.coordinates as [number, number];
+      const start = currentPositionsRef.current.get(id) ?? target;
+
+      // Se a distância for muito discrepante (> ~5km), não interpola (reset de trajeto)
+      const dLng = Math.abs(target[0] - start[0]);
+      const dLat = Math.abs(target[1] - start[1]);
+      if (dLng > 0.05 || dLat > 0.05) {
+        startPositions.set(id, target);
+      } else {
+        startPositions.set(id, start);
+      }
+      targetPositions.set(id, target);
+    }
+
+    const DURATION = 1400; // 1,4 segundo de deslizamento suave
+    const startTime = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / DURATION);
+      // Easing cúbico desacelerado (out-cubic) para parada suave
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      const interpolatedFeatures = newFeatures.map((f) => {
+        const id = f.properties?.id;
+        if (!id || f.geometry.type !== "Point") return f;
+
+        const start = startPositions.get(id);
+        const target = targetPositions.get(id);
+
+        if (!start || !target || (start[0] === target[0] && start[1] === target[1])) {
+          return f;
+        }
+
+        const curLng = start[0] + (target[0] - start[0]) * ease;
+        const curLat = start[1] + (target[1] - start[1]) * ease;
+        currentPositionsRef.current.set(id, [curLng, curLat]);
+
+        return {
+          ...f,
+          geometry: {
+            ...f.geometry,
+            coordinates: [curLng, curLat],
+          },
+        };
+      });
+
+      const src = map.getSource("vehicles") as maplibregl.GeoJSONSource | undefined;
+      if (src) {
+        src.setData({
+          type: "FeatureCollection",
+          features: interpolatedFeatures,
+        });
+      }
+
+      if (progress < 1) {
+        animFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        animFrameRef.current = null;
+        for (const [id, target] of targetPositions.entries()) {
+          currentPositionsRef.current.set(id, target);
+        }
+        if (src) src.setData(data);
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+    };
   }, [vehiclesGeoJson]);
 
   // Seguir / centralizar no ônibus selecionado

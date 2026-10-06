@@ -19,7 +19,23 @@ interface BRTVeiculo {
 export async function fetchBrtData(linhas: string[]): Promise<BusData[]> {
   const where =
     linhas.length > 0 ? { linha: { in: linhas } } : {};
-  const list = await prisma.brt.findMany({ where });
+  const list = await prisma.brt.findMany({
+    where,
+    select: {
+      codigo: true,
+      placa: true,
+      linha: true,
+      latitude: true,
+      longitude: true,
+      velocidade: true,
+      direcao: true,
+      dataHora: true,
+      sentido: true,
+      route_id: true,
+      trip_id: true,
+      shape_id: true,
+    },
+  });
 
   return list.map((r) => {
     const bus: BusData = {

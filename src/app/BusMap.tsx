@@ -106,7 +106,19 @@ export const BusMap = ({
   favoritos?: string[];
   onToggleFavorito?: (numero: string) => void;
 }) => {
-  const { data: buses, isLoading } = useBusData(selectedLinha);
+  const { data: buses, isLoading, dataUpdatedAt } = useBusData(selectedLinha);
+  const [secondsAgo, setSecondsAgo] = useState(0);
+
+  useEffect(() => {
+    if (!dataUpdatedAt) return;
+    const update = () => {
+      setSecondsAgo(Math.max(0, Math.floor((Date.now() - dataUpdatedAt) / 1000)));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [dataUpdatedAt]);
+
   const [routeShapes, setRouteShapes] = useState<RouteShapesMap>({});
   const [routeStops, setRouteStops] = useState<RouteStopsMap>({});
   const [busHistory, setBusHistory] = useState<BusHistoryMap>({});
@@ -305,66 +317,81 @@ export const BusMap = ({
           favoritos={favoritos}
           onToggleFavorito={onToggleFavorito}
         />
-        {/* Sentido por linha: mesmo formato com uma ou várias linhas */}
-        <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/30 px-4 py-2">
-          {selectedLinha.map((numero) => {
-            const labels = lineDirectionLabels[numero];
-            const dirs = selectedDirectionsByLine[numero] ?? {
-              ida: true,
-              volta: true,
-            };
-            const { bg, text } = getLineColor(numero);
-            const idaLabel = labels?.ida ?? "Ida";
-            const voltaLabel = labels?.volta ?? "Volta";
-            return (
-              <div key={numero} className="flex flex-wrap items-center gap-2">
-                {selectedLinha.length > 1 && (
-                  <span
-                    className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${bg} ${text}`}
+        {/* Sentido por linha & Badge de Atualização Ao Vivo */}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-2">
+          <div className="flex flex-col gap-2">
+            {selectedLinha.map((numero) => {
+              const labels = lineDirectionLabels[numero];
+              const dirs = selectedDirectionsByLine[numero] ?? {
+                ida: true,
+                volta: true,
+              };
+              const { bg, text } = getLineColor(numero);
+              const idaLabel = labels?.ida ?? "Ida";
+              const voltaLabel = labels?.volta ?? "Volta";
+              return (
+                <div key={numero} className="flex flex-wrap items-center gap-2">
+                  {selectedLinha.length > 1 && (
+                    <span
+                      className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${bg} ${text}`}
+                    >
+                      {numero}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedDirectionsByLine((prev) => {
+                        const cur = prev[numero] ?? { ida: true, volta: true };
+                        return { ...prev, [numero]: { ...cur, ida: !cur.ida } };
+                      })
+                    }
+                    className={`max-w-[min(100%,18rem)] truncate rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      dirs.ida
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                    }`}
+                    title={idaLabel}
                   >
-                    {numero}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedDirectionsByLine((prev) => {
-                      const cur = prev[numero] ?? { ida: true, volta: true };
-                      return { ...prev, [numero]: { ...cur, ida: !cur.ida } };
-                    })
-                  }
-                  className={`max-w-[min(100%,18rem)] truncate rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    dirs.ida
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  }`}
-                  title={idaLabel}
-                >
-                  {idaLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedDirectionsByLine((prev) => {
-                      const cur = prev[numero] ?? { ida: true, volta: true };
-                      return {
-                        ...prev,
-                        [numero]: { ...cur, volta: !cur.volta },
-                      };
-                    })
-                  }
-                  className={`max-w-[min(100%,18rem)] truncate rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    dirs.volta
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  }`}
-                  title={voltaLabel}
-                >
-                  {voltaLabel}
-                </button>
-              </div>
-            );
-          })}
+                    {idaLabel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedDirectionsByLine((prev) => {
+                        const cur = prev[numero] ?? { ida: true, volta: true };
+                        return {
+                          ...prev,
+                          [numero]: { ...cur, volta: !cur.volta },
+                        };
+                      })
+                    }
+                    className={`max-w-[min(100%,18rem)] truncate rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      dirs.volta
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                    }`}
+                    title={voltaLabel}
+                  >
+                    {voltaLabel}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {selectedLinha.length > 0 && (
+            <div className="flex items-center gap-1.5 self-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </span>
+              <span>Ao vivo</span>
+              <span className="text-muted-foreground/50">•</span>
+              <span className="text-muted-foreground">
+                {secondsAgo <= 2 ? "agora" : `${secondsAgo}s atrás`}
+              </span>
+            </div>
+          )}
         </div>
         <CardContent className="relative min-h-0 flex-1 p-0">
           <div className="h-full w-full overflow-hidden rounded-b-none md:rounded-b-lg">

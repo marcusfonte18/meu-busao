@@ -462,5 +462,47 @@ export function formatLastUpdate(timestamp: string): string {
   }
 }
 
+/**
+ * Calcula a distância em metros entre duas coordenadas [lng, lat] ou [lat, lng]
+ * utilizando a fórmula de Haversine.
+ */
+export function getHaversineDistance(
+  coord1: [number, number],
+  coord2: [number, number],
+  isLngLat = true
+): number {
+  const [lon1, lat1] = isLngLat ? coord1 : [coord1[1], coord1[0]];
+  const [lon2, lat2] = isLngLat ? coord2 : [coord2[1], coord2[0]];
+
+  const R = 6371000; // Raio da Terra em metros
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Estima o tempo de chegada em minutos com base na distância e velocidade atual (ou média urbana).
+ */
+export function estimateEtaMinutes(
+  distanceMeters: number,
+  speedKmh?: number
+): number {
+  // Velocidade urbana média de ~20 km/h se o ônibus estiver parado no semáforo ou velocidade for inválida
+  const effectiveSpeed =
+    speedKmh && speedKmh > 5 ? Math.min(speedKmh, 60) : 20;
+  const speedMetersPerMin = (effectiveSpeed * 1000) / 60;
+  const minutes = distanceMeters / speedMetersPerMin;
+  return Math.max(1, Math.round(minutes));
+}
+
 
 

@@ -62,6 +62,21 @@ export async function fetchBusData(linhas: Array<string>): Promise<BusData[]> {
         in: linhas,
       },
     },
+    select: {
+      id: true,
+      ordem: true,
+      linha: true,
+      latitude: true,
+      longitude: true,
+      velocidade: true,
+      direcao: true,
+      datahora: true,
+      timestamp: true,
+      sentido: true,
+      route_id: true,
+      trip_id: true,
+      shape_id: true,
+    },
   });
 
   return processBusData(buses, linhas);
